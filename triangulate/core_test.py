@@ -22,7 +22,7 @@ from triangulate import core
 
 TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
-    "triangulate/testdata",
+    'triangulate/testdata',
 )
 TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, "quoter.py")
 TEST_PROGRAM_ASSERT_LINE_NUMBER = 40
