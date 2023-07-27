@@ -24,7 +24,7 @@ TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
     'triangulate/testdata',
 )
-TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, "quoter.py")
+TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, 'quoter.py')
 TEST_PROGRAM_ASSERT_LINE_NUMBER = 40
 
 
@@ -119,5 +119,5 @@ class LocaliserTest(parameterized.TestCase):
     localiser._generate_probes_random(env.state)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   absltest.main()
