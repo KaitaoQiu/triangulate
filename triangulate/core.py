@@ -96,7 +96,7 @@ class State:
   ):
     self.codeview = descriptor.readlines()  # TODO(etbarr): catch exceptions?
     error_message = "bug trap out of bounds"
-    assert 0 <= bug_trap and bug_trap < len(self.codeview), error_message
+    assert 0 <= bug_trap < len(self.codeview), error_message
     self.set_ise(ise)
     if not ast_utils.is_assert_statement(self.codeview[bug_trap]):
       raise ValueError(
@@ -368,9 +368,11 @@ class Environment:
           "Unable to copy subject program to /tmp for instrumentation."
       ) from e
     try:
+      # pylint: disable=consider-using-with
       self.descriptor = open(
           self.instrumented_program_name, "r+", encoding="utf-8"
       )
+      # pylint: enable=consider-using-with
     except IOError as e:
       logging.error("Error: Unable to open file '%s'.", self.buggy_program_name)
       raise e
