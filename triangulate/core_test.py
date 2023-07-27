@@ -116,7 +116,7 @@ class LocaliserTest(parameterized.TestCase):
         probe_output_filename=probe_output_filename,
     )
     localiser = core.Localiser(env)
-    localiser._generate_probes_random(env.state)
+    localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
 
 
 if __name__ == '__main__':
