@@ -28,7 +28,10 @@ jobs:
     - run: pip freeze
 
     # Run pytype
-    - run: pytype triangulate
+    - name: pylint
+      run: |
+        pip install pylint
+        pylint triangulate
 
     # Run tests (in parallel)
     # TODO: Uncomment after tests have been added.
