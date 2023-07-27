@@ -31,30 +31,30 @@ TEST_PROGRAM_ASSERT_LINE_NUMBER = 40
 class EnvironmentTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      dict(
-          testcase_name='test_a',
-          buggy_program_name=TEST_PROGRAM_PATH,
-          illegal_state_expr='1 == 1',
-          bug_triggering_input='42',
-          bug_trap=TEST_PROGRAM_ASSERT_LINE_NUMBER,
-          action='<placeholder>',
-          expected_output='''\
+      {
+          'testcase_name': 'test_a',
+          'buggy_program_name': TEST_PROGRAM_PATH,
+          'illegal_state_expr': '1 == 1',
+          'bug_triggering_input': '42',
+          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'action': '<placeholder>',
+          'expected_output': '''\
 Today's inspirational quote:
 "Believe you can and you're halfway there." - Theodore Roosevelt
 ''',
-      ),
-      dict(
-          testcase_name='test_b',
-          buggy_program_name=TEST_PROGRAM_PATH,
-          illegal_state_expr='2 == 2',
-          bug_triggering_input='42',
-          bug_trap=TEST_PROGRAM_ASSERT_LINE_NUMBER,
-          action='<placeholder>',
-          expected_output='''\
+      },
+      {
+          'testcase_name': 'test_b',
+          'buggy_program_name': TEST_PROGRAM_PATH,
+          'illegal_state_expr': '2 == 2',
+          'bug_triggering_input': '42',
+          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'action': '<placeholder>',
+          'expected_output': '''\
 Today's inspirational quote:
 "Believe you can and you're halfway there." - Theodore Roosevelt
 ''',
-      ),
+      },
   )
   def test_execute_and_update(
       self,
@@ -87,13 +87,13 @@ Today's inspirational quote:
 class LocaliserTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      dict(
-          testcase_name='test_a',
-          buggy_program_name=TEST_PROGRAM_PATH,
-          illegal_state_expr='1 == 1',
-          bug_triggering_input='5',
-          bug_trap=TEST_PROGRAM_ASSERT_LINE_NUMBER,
-      ),
+      {
+          'testcase_name': 'test_a',
+          'buggy_program_name': TEST_PROGRAM_PATH,
+          'illegal_state_expr': '1 == 1',
+          'bug_triggering_input': '5',
+          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+      },
   )
   def test_generate_probes_random(
       self,
