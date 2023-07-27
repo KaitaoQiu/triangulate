@@ -340,6 +340,7 @@ class Environment:
     Returns:
         An environment instance
     """
+    del bug_triggering_input, probe_output_filename  # Unused for now.
     self.buggy_program_name = buggy_program_name
     self.buggy_program_output = set()
     self.descriptor = None
