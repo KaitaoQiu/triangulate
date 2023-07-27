@@ -27,6 +27,9 @@ jobs:
     - run: pip install -e .[dev]
     - run: pip freeze
 
+    # Run pytype
+    - run: pytype triangulate
+
     # Run tests (in parallel)
     # TODO: Uncomment after tests have been added.
     # - name: Run core tests
