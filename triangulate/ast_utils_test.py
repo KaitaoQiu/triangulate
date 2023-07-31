@@ -30,7 +30,7 @@ TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, "quoter.py")
 class ASTTest(absltest.TestCase):
 
   def test_get_insertion_points(self):
-    with open(TEST_PROGRAM_PATH, "r") as f:
+    with open(TEST_PROGRAM_PATH, "r", encoding="utf-8") as f:
       source = f.read()
     tree = ast.parse(source)
     insertion_points = ast_utils.get_insertion_points(tree)

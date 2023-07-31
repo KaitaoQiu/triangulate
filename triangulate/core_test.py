@@ -22,39 +22,39 @@ from triangulate import core
 
 TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
-    "triangulate/testdata",
+    'triangulate/testdata',
 )
-TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, "quoter.py")
+TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, 'quoter.py')
 TEST_PROGRAM_ASSERT_LINE_NUMBER = 40
 
 
 class EnvironmentTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      dict(
-          testcase_name='test_a',
-          buggy_program_name=TEST_PROGRAM_PATH,
-          illegal_state_expr='1 == 1',
-          bug_triggering_input='42',
-          bug_trap=TEST_PROGRAM_ASSERT_LINE_NUMBER,
-          action='<placeholder>',
-          expected_output='''\
+      {
+          'testcase_name': 'test_a',
+          'buggy_program_name': TEST_PROGRAM_PATH,
+          'illegal_state_expr': '1 == 1',
+          'bug_triggering_input': '42',
+          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'action': '<placeholder>',
+          'expected_output': '''\
 Today's inspirational quote:
 "Believe you can and you're halfway there." - Theodore Roosevelt
 ''',
-      ),
-      dict(
-          testcase_name='test_b',
-          buggy_program_name=TEST_PROGRAM_PATH,
-          illegal_state_expr='2 == 2',
-          bug_triggering_input='42',
-          bug_trap=TEST_PROGRAM_ASSERT_LINE_NUMBER,
-          action='<placeholder>',
-          expected_output='''\
+      },
+      {
+          'testcase_name': 'test_b',
+          'buggy_program_name': TEST_PROGRAM_PATH,
+          'illegal_state_expr': '2 == 2',
+          'bug_triggering_input': '42',
+          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'action': '<placeholder>',
+          'expected_output': '''\
 Today's inspirational quote:
 "Believe you can and you're halfway there." - Theodore Roosevelt
 ''',
-      ),
+      },
   )
   def test_execute_and_update(
       self,
@@ -87,13 +87,13 @@ Today's inspirational quote:
 class LocaliserTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      dict(
-          testcase_name='test_a',
-          buggy_program_name=TEST_PROGRAM_PATH,
-          illegal_state_expr='1 == 1',
-          bug_triggering_input='5',
-          bug_trap=TEST_PROGRAM_ASSERT_LINE_NUMBER,
-      ),
+      {
+          'testcase_name': 'test_a',
+          'buggy_program_name': TEST_PROGRAM_PATH,
+          'illegal_state_expr': '1 == 1',
+          'bug_triggering_input': '5',
+          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+      },
   )
   def test_generate_probes_random(
       self,
@@ -116,8 +116,8 @@ class LocaliserTest(parameterized.TestCase):
         probe_output_filename=probe_output_filename,
     )
     localiser = core.Localiser(env)
-    localiser._generate_probes_random(env.state)
+    localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   absltest.main()
