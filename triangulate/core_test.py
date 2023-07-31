@@ -24,19 +24,16 @@ TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
     'triangulate/testdata',
 )
-TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, 'quoter.py')
-TEST_PROGRAM_ASSERT_LINE_NUMBER = 40
-
 
 class EnvironmentTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
           'testcase_name': 'test_a',
-          'buggy_program_name': TEST_PROGRAM_PATH,
+          'buggy_program_name': 'quoter.py',
           'illegal_state_expr': '1 == 1',
           'bug_triggering_input': '42',
-          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'bug_trap': 54,
           'action': '<placeholder>',
           'expected_output': '''\
 Today's inspirational quote:
@@ -45,10 +42,10 @@ Today's inspirational quote:
       },
       {
           'testcase_name': 'test_b',
-          'buggy_program_name': TEST_PROGRAM_PATH,
+          'buggy_program_name': 'quoter.py',
           'illegal_state_expr': '2 == 2',
           'bug_triggering_input': '42',
-          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'bug_trap': 54,
           'action': '<placeholder>',
           'expected_output': '''\
 Today's inspirational quote:
@@ -68,8 +65,9 @@ Today's inspirational quote:
       max_steps: int = 100,
       probe_output_filename: str = '',
   ):
+    test_filepath = os.path.join(TESTDATA_DIRECTORY, buggy_program_name)
     env = core.Environment(
-        buggy_program_name=buggy_program_name,
+        buggy_program_name=test_filepath,
         illegal_state_expr=illegal_state_expr,
         bug_triggering_input=bug_triggering_input,
         bug_trap=bug_trap,
@@ -89,10 +87,10 @@ class LocaliserTest(parameterized.TestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'test_a',
-          'buggy_program_name': TEST_PROGRAM_PATH,
+          'buggy_program_name': 'quoter.py',
           'illegal_state_expr': '1 == 1',
           'bug_triggering_input': '5',
-          'bug_trap': TEST_PROGRAM_ASSERT_LINE_NUMBER,
+          'bug_trap': 54,
       },
   )
   def test_generate_probes_random(
@@ -101,7 +99,7 @@ class LocaliserTest(parameterized.TestCase):
       illegal_state_expr: str,
       bug_triggering_input: str,
       bug_trap: int,
-      burnin: int = 100,
+      burnin: int = 10,
       max_steps: int = 100,
       probe_output_filename: str = 'probe_output.txt',
   ):

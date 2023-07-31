@@ -94,34 +94,31 @@ def main(argv):
   if len(argv) < 1:
     raise app.UsageError("Too few command-line arguments.")
 
-  logging.set_verbosity(flags.FLAGS.loglevel)
+  FLAGS = flags.FLAGS
+  logging.set_verbosity(FLAGS.loglevel)
 
-  if not 0 <= flags.FLAGS.burnin < 1:
+  if not 0 <= FLAGS.burnin < 1:
     err_template = "Error: burnin period must fall into the interval [0,1)."
     logging.error(err_template)
     raise ValueError(err_template)
 
-  if not flags.FLAGS.buggy_program_name:
-    flags.FLAGS.buggy_program_name = input(
+  if not FLAGS.buggy_program_name:
+    FLAGS.buggy_program_name = input(
         "Please enter the name of the buggy program: "
     )
 
-  env = Environment(**flags.FLAGS)
+  env = Environment(**FLAGS.flag_values_dict())
   localiser = Localiser(env)
 
   while not env.terminate():
     env.update(localiser.pick_action(env.state, env.reward()))
 
-  if flags.FLAGS.loglevel != logging.DEBUG:
-    try:
-      os.remove(env.instrumented_program_name)
-    except IOError as e:
-      logging.error(
-          "Error: Unable to remove temp file '%s'.",
-          env.instrumented_program_name,
-      )
-      raise e
-
+  if FLAGS.loglevel == logging.DEBUG:
+    # The following statement exploits an undocumented feature of Python 3.x.
+    env.subject_with_probes._closer.delete = False 
+    print(
+        f"The instrumented subject program saved to {env.subject_with_probes.name}."
+    )
 
 if __name__ == "__main__":
   app.run(main)

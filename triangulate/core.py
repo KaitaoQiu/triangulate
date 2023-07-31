@@ -19,7 +19,6 @@ import contextlib
 import io
 import math
 import os
-import shutil
 import tempfile
 from typing import List, TextIO, Tuple
 
@@ -37,18 +36,18 @@ rng = np.random.default_rng(seed=654)
 
 # TODO(etbarr):  Rewrite to use AST.
 def write_lines_to_file(
-    descriptor: io.TextIOBase, offset_lines: List[Tuple[int, str]]
+    target_file: TextIO, offset_lines: List[Tuple[int, str]]
 ) -> None:
-  """Write lines to their paired offset in the given file descriptor.
+  """Write lines to their paired offset in the target file.
 
   Args:
-      descriptor:  File descriptor to which the to write the lines to their
+      target_file:  File descriptor to which the to write the lines to their
         paired offsets
       offset_lines:  A list of lines paired with a target offset
   """
   for offset, line in offset_lines:
-    descriptor.seek(offset)
-    descriptor.write(line)
+    target_file.seek(offset)
+    target_file.write(line)
 
 
 ################################################################################
@@ -61,7 +60,7 @@ class State:
 
   Attributes: codeview : [str] code lines in current agent window ise : str
   illegal state expression focal_expr : str current expression
-      descriptor: file descriptor of program being debugged
+      subject_with_probes: file descriptor of program being debugged
       probes: [str x int] list of probes, which pair a query and an offset.
   """
 
@@ -89,12 +88,12 @@ class State:
 
   def __init__(
       self,
-      descriptor: TextIO,
+      subject_with_probes: TextIO,
       ise: str,
       bug_trap: int,
       probes: List[Tuple[int, str]] | None = None,
   ):
-    self.codeview = descriptor.readlines()  # TODO(etbarr): catch exceptions?
+    self.codeview = subject_with_probes.readlines()  # TODO(etbarr): catch exceptions?
     error_message = "bug trap out of bounds"
     assert 0 <= bug_trap < len(self.codeview), error_message
     self.set_ise(ise)
@@ -106,7 +105,7 @@ class State:
       )
     focal_expr = ast_utils.extract_assert_expression(self.codeview[bug_trap])
     self.set_focal_expr(focal_expr)
-    self.descriptor = descriptor
+    self.subject_with_probes = subject_with_probes
     if probes is None:
       self.probes = []
     else:
@@ -145,7 +144,7 @@ class State:
     Returns:
         Object contents serialised into a string.
     """
-    print(self.descriptor, self.codeview)
+    print(self.subject_with_probes, self.codeview)
     # TODO(etbarr): implement.
 
 
@@ -197,8 +196,9 @@ class Agent:
     """
     for offset, probe in probes:
       state.codeview.insert(offset, probe)
-    state.descriptor.seek(0)
-    state.descriptor.writelines(state.codeview)
+    state.subject_with_probes.seek(0)
+    state.codeview.seek(0)
+    state.subject_with_probes.writelines(state.codeview)
 
   def repr(self) -> str:
     """Convert object into string representation.
@@ -214,7 +214,7 @@ class Localiser(Agent):
 
   Attributes: codeview : [str] code lines in current agent window ise : str
   illegal state expression focal_expression : str current expression
-      descriptor: file descriptor to copy of program being debugged
+      subject_with_probes: file descriptor to copy of program being debugged
       probes: [str x int] list of probes, which pair a query and an offset.
 
   Methods:
@@ -232,8 +232,8 @@ class Localiser(Agent):
       List of probes, which pair queries and offsets
     """
 
-    state.descriptor.seek(0)
-    tree = ast.parse(state.descriptor.read())
+    state.subject_with_probes.seek(0)
+    tree = ast.parse(state.subject_with_probes.read())
     insertion_points = ast_utils.get_insertion_points(tree)
     samples = sampling_utils.sample_zipfian(1, len(insertion_points))
     offsets = sampling_utils.sample_wo_replacement_uniform(
@@ -307,11 +307,10 @@ class Environment:
   Attributes:
       buggy_program_name: str
       buggy_program_output: str
-      instrumented_program_name: str
       steps: int
       max_burnin: int
       max_steps: int
-      descriptor: typeof(file descriptor)
+      subject_with_probes: TextIO
       state: State
   """
 
@@ -324,6 +323,7 @@ class Environment:
       burnin: int,
       max_steps: int,
       probe_output_filename: str,
+      **_
   ):
     """Construct an environment instance.
 
@@ -343,7 +343,7 @@ class Environment:
     del bug_triggering_input, probe_output_filename  # Unused for now.
     self.buggy_program_name = buggy_program_name
     self.buggy_program_output = set()
-    self.descriptor = None
+    self.subject_with_probes = None
     self.steps = 0
     self.max_steps = max_steps
     if burnin != 0:
@@ -356,27 +356,24 @@ class Environment:
       err_template = "Error: %s is not a Python script."
       logging.error(err_template, self.buggy_program_name)
       raise ValueError(err_template, self.buggy_program_name)
-    collision_avoiding_prefix = "__"
     try:
-      self.instrumented_program_name = os.path.join(
-          tempfile.gettempdir(),
-          collision_avoiding_prefix + os.path.basename(self.buggy_program_name)
-      )
-      shutil.copyfile(self.buggy_program_name, self.instrumented_program_name)
-    except IOError as e:
-      raise IOError(
-          "Unable to copy subject program to /tmp for instrumentation."
-      ) from e
-    try:
+      self.subject_with_probes = tempfile.NamedTemporaryFile(mode='r+')
       # pylint: disable=consider-using-with
-      self.descriptor = open(
-          self.instrumented_program_name, "r+", encoding="utf-8"
-      )
+      with open(self.buggy_program_name, 'r') as f:
+          data = f.read()
       # pylint: enable=consider-using-with
+      self.subject_with_probes.write(data)
+      self.subject_with_probes.flush()
+      self.subject_with_probes.seek(0)
     except IOError as e:
+      breakpoint()
+      dump_call_stack()
       logging.error("Error: Unable to open file '%s'.", self.buggy_program_name)
-      raise e
-    self.state = State(self.descriptor, illegal_state_expr, bug_trap)
+      raise IOError(
+          "Unable to make a temporary copy of the subject program "
+          f"{self.buggy_program_name} to be instrumented with probes."
+      ) from e
+    self.state = State(self.subject_with_probes, illegal_state_expr, bug_trap)
 
     self.buggy_program_output.add(self.execute_subject())
 
@@ -390,10 +387,10 @@ class Environment:
     Raises:
       CallProcessError if subprocess.run fails.
     """
-    assert self.descriptor is not None
-    self.descriptor.seek(0)
+    assert self.subject_with_probes is not None
+    self.subject_with_probes.seek(0)
 
-    python_source = self.descriptor.read()
+    python_source = self.subject_with_probes.read()
     try:
       compiled_source = compile(
           python_source, "<code_to_instrument>", mode="exec"
