@@ -30,8 +30,7 @@ class EnvironmentTest(parameterized.TestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'test_a',
-          'buggy_program_name': 'quoter.py',
-          'illegal_state_expr': '1 == 1',
+          'subject': 'quoter.py',
           'bug_triggering_input': '42',
           'bug_trap': 54,
           'action': '<placeholder>',
@@ -42,8 +41,7 @@ Today's inspirational quote:
       },
       {
           'testcase_name': 'test_b',
-          'buggy_program_name': 'quoter.py',
-          'illegal_state_expr': '2 == 2',
+          'subject': 'quoter.py',
           'bug_triggering_input': '42',
           'bug_trap': 54,
           'action': '<placeholder>',
@@ -55,8 +53,7 @@ Today's inspirational quote:
   )
   def test_execute_and_update(
       self,
-      buggy_program_name: str,
-      illegal_state_expr: str,
+      subject: str,
       bug_triggering_input: str,
       bug_trap: int,
       action: str,
@@ -65,15 +62,15 @@ Today's inspirational quote:
       max_steps: int = 100,
       probe_output_filename: str = '',
   ):
-    test_filepath = os.path.join(TESTDATA_DIRECTORY, buggy_program_name)
+    test_filepath = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
-        buggy_program_name=test_filepath,
-        illegal_state_expr=illegal_state_expr,
+        subject=test_filepath,
         bug_triggering_input=bug_triggering_input,
         bug_trap=bug_trap,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
+        loglevel=0
     )
     # TODO(etbarr): Test `execute_subject` and `update` methods.
     output = env.execute_subject()
@@ -87,31 +84,29 @@ class LocaliserTest(parameterized.TestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'test_a',
-          'buggy_program_name': 'quoter.py',
-          'illegal_state_expr': '1 == 1',
+          'subject': 'quoter.py',
           'bug_triggering_input': '5',
           'bug_trap': 54,
       },
   )
   def test_generate_probes_random(
       self,
-      buggy_program_name: str,
-      illegal_state_expr: str,
+      subject: str,
       bug_triggering_input: str,
       bug_trap: int,
       burnin: int = 10,
       max_steps: int = 100,
       probe_output_filename: str = 'probe_output.txt',
   ):
-    test_filepath = os.path.join(TESTDATA_DIRECTORY, buggy_program_name)
+    test_filepath = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
-        buggy_program_name=test_filepath,
-        illegal_state_expr=illegal_state_expr,
+        subject=test_filepath,
         bug_triggering_input=bug_triggering_input,
         bug_trap=bug_trap,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
+        loglevel=0
     )
     localiser = core.Localiser(env)
     localiser._generate_probes_random(env.state)  # pylint: disable=protected-access

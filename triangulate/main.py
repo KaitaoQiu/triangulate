@@ -14,8 +14,6 @@
 
 """Main script."""
 
-import os
-
 from absl import app
 from absl import flags
 from absl import logging
@@ -25,23 +23,11 @@ Localiser = core.Localiser
 Environment = core.Environment
 
 flags.DEFINE_string(
-    "buggy_program_name",
+    "subject",
     None,
     help="the name of a buggy file",
     required=True,
     short_name="p",
-)
-flags.DEFINE_string(
-    "illegal_state_expr",
-    None,
-    required=True,
-    short_name="i",
-    help=(
-        "An expression defining illegal state; it is a fragment "
-        "of the program's specification, which is almost never "
-        "fully realised. Concretely, it will, for us, usually "
-        "be the complement of an assertion."
-    ),
 )
 flags.DEFINE_string(
     "bug_triggering_input",
@@ -94,7 +80,7 @@ def main(argv):
   if len(argv) < 1:
     raise app.UsageError("Too few command-line arguments.")
 
-  FLAGS = flags.FLAGS
+  FLAGS = flags.FLAGS # pylint: disable=invalid-name
   logging.set_verbosity(FLAGS.loglevel)
 
   if not 0 <= FLAGS.burnin < 1:
@@ -102,23 +88,25 @@ def main(argv):
     logging.error(err_template)
     raise ValueError(err_template)
 
-  if not FLAGS.buggy_program_name:
-    FLAGS.buggy_program_name = input(
-        "Please enter the name of the buggy program: "
+  if not FLAGS.subject:
+    FLAGS.subject = input(
+        "Please enter the name of the subject program: "
     )
 
-  env = Environment(**FLAGS.flag_values_dict())
+  # Cannot use ** as Abseil populates its dictionary with unrelated flags
+  env = Environment(
+    subject = FLAGS.flag_values_dict()["subject"],
+    bug_triggering_input = FLAGS.flag_values_dict()["bug_triggering_input"],
+    bug_trap = FLAGS.flag_values_dict()["bug_trap"],
+    burnin = FLAGS.flag_values_dict()["burnin"],
+    max_steps = FLAGS.flag_values_dict()["max_steps"],
+    probe_output_filename = FLAGS.flag_values_dict()["probe_output_filename"],
+    loglevel = FLAGS.loglevel
+  )
   localiser = Localiser(env)
 
   while not env.terminate():
     env.update(localiser.pick_action(env.state, env.reward()))
-
-  if FLAGS.loglevel == logging.DEBUG:
-    # The following statement exploits an undocumented feature of Python 3.x.
-    env.subject_with_probes._closer.delete = False 
-    print(
-        f"The instrumented subject program saved to {env.subject_with_probes.name}."
-    )
 
 if __name__ == "__main__":
   app.run(main)
