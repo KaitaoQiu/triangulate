@@ -94,13 +94,14 @@ def main(argv):
     )
 
   # Cannot use ** as Abseil populates its dictionary with unrelated flags
+  flags_dict = FLAGS.flag_values_dict()
   env = Environment(
-    subject = FLAGS.flag_values_dict()["subject"],
-    bug_triggering_input = FLAGS.flag_values_dict()["bug_triggering_input"],
-    bug_trap = FLAGS.flag_values_dict()["bug_trap"],
-    burnin = FLAGS.flag_values_dict()["burnin"],
-    max_steps = FLAGS.flag_values_dict()["max_steps"],
-    probe_output_filename = FLAGS.flag_values_dict()["probe_output_filename"],
+    subject = flags_dict["subject"],
+    bug_triggering_input = flags_dict["bug_triggering_input"],
+    bug_trap = flags_dict["bug_trap"],
+    burnin = flags_dict["burnin"],
+    max_steps = flags_dict["max_steps"],
+    probe_output_filename = flags_dict["probe_output_filename"],
     loglevel = FLAGS.loglevel
   )
   localiser = Localiser(env)
