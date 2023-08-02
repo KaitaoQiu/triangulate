@@ -20,7 +20,7 @@ import io
 import math
 import os
 import tempfile
-from typing import List, TextIO, Tuple
+from typing import List, IO, Tuple
 
 from absl import logging
 import numpy as np
@@ -36,7 +36,7 @@ rng = np.random.default_rng(seed=654)
 
 # TODO(etbarr):  Rewrite to use AST.
 def write_lines_to_file(
-    target_file: TextIO, offset_lines: List[Tuple[int, str]]
+    target_file: IO[str], offset_lines: List[Tuple[int, str]]
 ) -> None:
   """Write lines to their paired offset in the target file.
 
@@ -60,10 +60,36 @@ class State:
 
   Attributes:
     codeview : [str] code lines in current agent window
+    ise : str illegal state expression
     focal_expr : str current expression
     subject_with_probes: file descriptor of program being debugged
     probes: [str x int] list of probes, which pair a query and an offset.
   """
+
+  def __init__(
+      self,
+      subject_with_probes: IO[str],
+      bug_trap: int,
+      probes: List[Tuple[int, str]] | None = None,
+  ):
+    self.codeview = subject_with_probes.readlines()  # TODO(etbarr): exceptions?
+    error_message = "bug trap out of bounds"
+    assert 0 <= bug_trap < len(self.codeview), error_message
+    if ast_utils.is_assert_statement(self.codeview[bug_trap]):
+      self.set_ise(ast_utils.extract_assert_expression(self.codeview[bug_trap]))
+    else:
+      raise ValueError(
+          "Bug_trap must identify an assertion statement, but"
+          f" codeview[bug_trap={bug_trap}] ="
+          f" '{self.codeview[bug_trap].strip()}', which is not."
+      )
+    focal_expr = ast_utils.extract_assert_expression(self.codeview[bug_trap])
+    self.set_focal_expr(focal_expr)
+    self.subject_with_probes = subject_with_probes
+    if probes is None:
+      self.probes = []
+    else:
+      self.probes = probes
 
   def set_ise(self, ise: str) -> None:
     try:
@@ -86,31 +112,6 @@ class State:
       # e.add_note(err_template % expr)
       raise e
     self.focal_expr = focal_expr
-
-  def __init__(
-      self,
-      subject_with_probes: TextIO,
-      bug_trap: int,
-      probes: List[Tuple[int, str]] | None = None,
-  ):
-    self.codeview = subject_with_probes.readlines()  # TODO(etbarr): exceptions?
-    error_message = "bug trap out of bounds"
-    assert 0 <= bug_trap < len(self.codeview), error_message
-    if ast_utils.is_assert_statement(self.codeview[bug_trap]):
-      self.set_ise(ast_utils.extract_assert_expression(self.codeview[bug_trap]))
-    else:
-      raise ValueError(
-          "Bug_trap must identify an assertion statement, but"
-          f" codeview[bug_trap={bug_trap}] ="
-          f" '{self.codeview[bug_trap].strip()}', which is not."
-      )
-    focal_expr = ast_utils.extract_assert_expression(self.codeview[bug_trap])
-    self.set_focal_expr(focal_expr)
-    self.subject_with_probes = subject_with_probes
-    if probes is None:
-      self.probes = []
-    else:
-      self.probes = probes
 
   def get_illegal_state_expr_ids(self):
     """Return identifiers in the illegal state expression.
@@ -198,7 +199,6 @@ class Agent:
     for offset, probe in probes:
       state.codeview.insert(offset, probe)
     state.subject_with_probes.seek(0)
-    state.codeview.seek(0)
     state.subject_with_probes.writelines(state.codeview)
 
   def repr(self) -> str:
@@ -313,7 +313,7 @@ class Environment:
       steps: int
       max_burnin: int
       max_steps: int
-      subject_with_probes: TextIO
+      subject_with_probes: IO[str]
       state: State
   """
 
@@ -368,14 +368,14 @@ class Environment:
       # pylint: disable=consider-using-with
       if loglevel == logging.DEBUG:
         self.subject_with_probes = tempfile.NamedTemporaryFile(
-                mode="r+", delete=False
+            mode="r+", delete=False
         )
         print(
-          f"The subject with probes saved to {self.subject_with_probes.name}."
+            f"The subject with probes saved to {self.subject_with_probes.name}."
         )
       else:
         self.subject_with_probes = tempfile.NamedTemporaryFile(
-                mode="r+", delete=True
+            mode="r+", delete=True
         )
       # pylint: enable=consider-using-with
       with open(self.subject, "r", encoding="utf8") as f:
