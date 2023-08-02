@@ -16,6 +16,7 @@ keywords = []
 # pip dependencies of the project
 # Installed locally with `pip install -e .`
 dependencies = [
+    "absl-py",
     "coloredlogs",
     "python-magic",
     "numpy",
@@ -37,6 +38,7 @@ dev = [
     "pytest",
     "pytest-xdist",
     "pylint>=2.6.0",
+    "pytype",
     "pyink",
 ]
 
