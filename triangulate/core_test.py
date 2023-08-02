@@ -20,35 +20,60 @@ from absl.testing import absltest
 from absl.testing import parameterized
 from triangulate import core
 
+################################################################################
+# Test utilities
+################################################################################
+
+
+def get_first_line_number_by_prefix(s: str, prefix: str) -> int | None:
+  """Returns the first line number in `s` whose line starts with `prefix`."""
+  for i, line in enumerate(s.splitlines()):
+    if line.startswith(prefix):
+      return i
+  return None
+
+
 TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
     'triangulate/testdata',
 )
+SUBJECT_FILENAME = 'quoter.py'
+SUBJECT_FILEPATH = os.path.join(TESTDATA_DIRECTORY, SUBJECT_FILENAME)
+with open(SUBJECT_FILEPATH, 'r', encoding='utf8') as f:
+  SUBJECT_CONTENT = f.read()
+
+# Note: hardcoded line numbers are unstable between internal and external code.
+BUG_TRAP = get_first_line_number_by_prefix(SUBJECT_CONTENT, 'assert')
+
+################################################################################
+# Test cases
+################################################################################
+
 
 class EnvironmentTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
           'testcase_name': 'test_a',
-          'subject': 'quoter.py',
+          'subject': SUBJECT_FILEPATH,
           'bug_triggering_input': '42',
-          'bug_trap': 54,
+          'bug_trap': BUG_TRAP,
           'action': '<placeholder>',
-          'expected_output': '''\
+          'expected_output': """\
 Today's inspirational quote:
 "Believe you can and you're halfway there." - Theodore Roosevelt
-''',
+""",
       },
       {
           'testcase_name': 'test_b',
-          'subject': 'quoter.py',
+          'subject': SUBJECT_FILEPATH,
           'bug_triggering_input': '42',
-          'bug_trap': 54,
+          'bug_trap': BUG_TRAP,
           'action': '<placeholder>',
-          'expected_output': '''\
+          'expected_output': """\
 Today's inspirational quote:
 "Believe you can and you're halfway there." - Theodore Roosevelt
-''',
+""",
       },
   )
   def test_execute_and_update(
@@ -62,15 +87,14 @@ Today's inspirational quote:
       max_steps: int = 100,
       probe_output_filename: str = '',
   ):
-    test_filepath = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
-        subject=test_filepath,
+        subject=subject,
         bug_triggering_input=bug_triggering_input,
         bug_trap=bug_trap,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
-        loglevel=0
+        loglevel=0,
     )
     # TODO(etbarr): Test `execute_subject` and `update` methods.
     output = env.execute_subject()
@@ -84,9 +108,9 @@ class LocaliserTest(parameterized.TestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'test_a',
-          'subject': 'quoter.py',
+          'subject': SUBJECT_FILEPATH,
           'bug_triggering_input': '5',
-          'bug_trap': 54,
+          'bug_trap': BUG_TRAP,
       },
   )
   def test_generate_probes_random(
@@ -98,15 +122,14 @@ class LocaliserTest(parameterized.TestCase):
       max_steps: int = 100,
       probe_output_filename: str = 'probe_output.txt',
   ):
-    test_filepath = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
-        subject=test_filepath,
+        subject=subject,
         bug_triggering_input=bug_triggering_input,
         bug_trap=bug_trap,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
-        loglevel=0
+        loglevel=0,
     )
     localiser = core.Localiser(env)
     localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
