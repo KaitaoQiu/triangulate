@@ -17,9 +17,9 @@ keywords = []
 # Installed locally with `pip install -e .`
 dependencies = [
     "absl-py",
-    "coloredlogs",
-    "python-magic",
     "numpy",
+    "python-magic",
+    "termcolor",
 ]
 
 # `version` is automatically set by flit to use `triangulate.__version__`
