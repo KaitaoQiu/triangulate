@@ -26,10 +26,6 @@ def sample_zipfian(
   """Generate a sample set from a Zipfian distribution over an integer interval.
 
   Args:
-
-  Args:
-
-  Args:
       num_samples: The number of samples to return
       zipf_param: The powerlaw exponent
       support_size:  The size of the support, i.e. the width of the interval
@@ -39,6 +35,8 @@ def sample_zipfian(
   """
 
   weights = 1.0 / np.power(np.arange(1, support_size + 1), zipf_param)
+  # TODO(etbarr): Fix negative weight values.
+  weights = np.maximum(weights, 0)
   weights /= np.sum(weights)
 
   return rng.choice(np.arange(1, support_size + 1), size=num_samples, p=weights)
