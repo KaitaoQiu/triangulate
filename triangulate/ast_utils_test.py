@@ -15,9 +15,12 @@
 """Tests for third_party.py.triangulate."""
 
 import ast
+from collections.abc import Sequence
 import os
 
 from absl.testing import absltest
+from absl.testing import parameterized
+
 from triangulate import ast_utils
 
 TESTDATA_DIRECTORY = os.path.join(
@@ -43,6 +46,48 @@ class ASTTest(absltest.TestCase):
     test_expr_fv = set(["c", "x", "y", "z"])
     fv = ast_utils.extract_identifiers(test_expr)
     self.assertEqual(test_expr_fv, set(fv))
+
+
+EXAMPLE_PROGRAM = """\
+def add_one(x):
+    triangulate_probe(['x'], locals())
+    assert x == 1
+    return x + 1
+""".strip()
+
+
+class ASTNodeSelection(parameterized.TestCase):
+  """AST node selection tests."""
+
+  def setUp(self):
+    super().setUp()
+    self.tree = ast.parse(EXAMPLE_PROGRAM)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name="has_type_return",
+          node_predicate=ast_utils.HasType(ast.Return),
+          expected_node_texts=["return x + 1"],
+      ),
+      dict(
+          testcase_name="overlaps_with_line_number",
+          node_predicate=ast_utils.OverlapsWithLineNumber(1),
+          expected_node_texts=[EXAMPLE_PROGRAM, "x"],
+      ),
+      dict(
+          testcase_name="is_probe_statement",
+          node_predicate=ast_utils.IsProbeStatement(),
+          expected_node_texts=["triangulate_probe(['x'], locals())"],
+      ),
+  )
+  def test_select_nodes(
+      self,
+      node_predicate: ast_utils.NodePredicate,
+      expected_node_texts: Sequence[str],
+  ):
+    nodes = ast_utils.AST(EXAMPLE_PROGRAM).select_nodes(node_predicate)
+    node_texts = tuple(ast.unparse(node) for node in nodes)
+    self.assertSequenceEqual(node_texts, expected_node_texts)
 
 
 if __name__ == "__main__":
