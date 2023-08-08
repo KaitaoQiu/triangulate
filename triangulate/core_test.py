@@ -14,10 +14,13 @@
 
 """Tests for core."""
 
+from collections.abc import Sequence
 import os
+import re
 
 from absl.testing import absltest
 from absl.testing import parameterized
+
 from triangulate import core
 
 ################################################################################
@@ -25,25 +28,10 @@ from triangulate import core
 ################################################################################
 
 
-def get_first_line_number_by_prefix(s: str, prefix: str) -> int | None:
-  """Returns the first line number in `s` whose line starts with `prefix`."""
-  for i, line in enumerate(s.splitlines()):
-    if line.startswith(prefix):
-      return i
-  return None
-
-
 TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
     'triangulate/testdata',
 )
-SUBJECT_FILENAME = 'quoter.py'
-SUBJECT_FILEPATH = os.path.join(TESTDATA_DIRECTORY, SUBJECT_FILENAME)
-with open(SUBJECT_FILEPATH, 'r', encoding='utf8') as f:
-  SUBJECT_CONTENT = f.read()
-
-# Note: hardcoded line numbers are unstable between internal and external code.
-BUG_TRAP = get_first_line_number_by_prefix(SUBJECT_CONTENT, 'assert')
 
 ################################################################################
 # Test cases
@@ -53,83 +41,83 @@ BUG_TRAP = get_first_line_number_by_prefix(SUBJECT_CONTENT, 'assert')
 class EnvironmentTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      {
-          'testcase_name': 'test_a',
-          'subject': SUBJECT_FILEPATH,
-          'bug_triggering_input': '42',
-          'bug_trap': BUG_TRAP,
-          'action': '<placeholder>',
-          'expected_output': """\
+      dict(
+          testcase_name='test_quoter_index_0',
+          subject='quoter.py',
+          subject_argv=['--index', '0'],
+          action='<placeholder>',
+          expected_output="""\
+Arguments: index = 0, seed = 0
 Today's inspirational quote:
-"Believe you can and you're halfway there." - Theodore Roosevelt
+"It does not matter how slowly you go as long as you do not stop." - Confucius
 """,
-      },
-      {
-          'testcase_name': 'test_b',
-          'subject': SUBJECT_FILEPATH,
-          'bug_triggering_input': '42',
-          'bug_trap': BUG_TRAP,
-          'action': '<placeholder>',
-          'expected_output': """\
-Today's inspirational quote:
-"Believe you can and you're halfway there." - Theodore Roosevelt
-""",
-      },
+      ),
+      dict(
+          testcase_name='test_quoter_no_argv',
+          subject='quoter.py',
+          action='<placeholder>',
+          expected_output=re.compile(
+              'AssertionError: The first quote was not selected.'
+          ),
+      ),
   )
   def test_execute_and_update(
       self,
       subject: str,
-      bug_triggering_input: str,
-      bug_trap: int,
       action: str,
-      expected_output: str,
+      expected_output: str | re.Pattern[str],
+      subject_argv: Sequence[str] = (),
+      bug_lineno: int | None = None,
       burnin: int = 100,
       max_steps: int = 100,
       probe_output_filename: str = '',
   ):
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
         subject=subject,
-        bug_triggering_input=bug_triggering_input,
-        bug_trap=bug_trap,
+        subject_argv=(subject,) + tuple(subject_argv),
+        bug_lineno=bug_lineno,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
-        loglevel=0,
     )
     # TODO(etbarr): Test `execute_subject` and `update` methods.
+    # NOTE(danielzheng): Change printing to be on command line.
     output = env.execute_subject()
-    print(output)
     env.update(action=action)
-    self.assertEqual(output, expected_output)
+    # If output is a regex, check regex match.
+    if isinstance(expected_output, re.Pattern):
+      self.assertRegex(output, expected_output)
+    # Otherwise, check string equality.
+    else:
+      self.assertEqual(output, expected_output)
 
 
 class LocaliserTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      {
-          'testcase_name': 'test_a',
-          'subject': SUBJECT_FILEPATH,
-          'bug_triggering_input': '5',
-          'bug_trap': BUG_TRAP,
-      },
+      dict(
+          testcase_name='test_a',
+          subject='quoter.py',
+      ),
   )
   def test_generate_probes_random(
       self,
       subject: str,
-      bug_triggering_input: str,
-      bug_trap: int,
+      subject_argv: Sequence[str] = (),
+      bug_lineno: int | None = None,
       burnin: int = 10,
       max_steps: int = 100,
       probe_output_filename: str = 'probe_output.txt',
   ):
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
         subject=subject,
-        bug_triggering_input=bug_triggering_input,
-        bug_trap=bug_trap,
+        subject_argv=subject_argv,
+        bug_lineno=bug_lineno,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
-        loglevel=0,
     )
     localiser = core.Localiser(env)
     localiser._generate_probes_random(env.state)  # pylint: disable=protected-access

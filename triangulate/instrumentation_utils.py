@@ -18,6 +18,9 @@ from collections.abc import Mapping, Sequence
 import contextlib
 import inspect
 import io
+import runpy
+import sys
+import tempfile
 import traceback
 from typing import Any
 
@@ -54,26 +57,28 @@ def probe(variable_names: Sequence[str], locals_dict: Mapping[str, Any]):
 
 
 def run_with_instrumentation(
-    python_source: str, filename: str = "<code_to_instrument>"
+    python_source: str,
+    argv: Sequence[str],
 ) -> str:
-  """Executes `python_source` and returns stdout and stderr output."""
-  try:
-    compiled_source = compile(python_source, filename, mode="exec")
-  except SyntaxError as e:
-    raise e
-
+  """Executes `python_source` and returns stdout and stderr concatenated."""
   # A `globals()` dict for usage with `exec` to support instrumentation.
-  exec_globals = {PROBE_FUNCTION_NAME: probe, "__name__": "__main__"}
-  exec_locals = None
+  exec_globals = {PROBE_FUNCTION_NAME: probe}
   buffer = io.StringIO()
   with (
       contextlib.redirect_stdout(buffer),
       contextlib.redirect_stderr(buffer),
   ):
+    old_argv = sys.argv
     try:
-      exec(compiled_source, exec_globals, exec_locals)  # pylint:disable=exec-used
+      with tempfile.NamedTemporaryFile(mode="w+t") as f:
+        f.write(python_source)
+        f.flush()
+        sys.argv = list(argv)
+        runpy.run_path(f.name, init_globals=exec_globals, run_name="__main__")
     except Exception as e:  # pylint:disable=broad-except
       # Print exception from the executed program.
       print_color("Exception raised:", color="yellow", bold=False)
       traceback.print_exception(e.__context__ or e)
+    finally:
+      sys.argv = old_argv
   return buffer.getvalue()

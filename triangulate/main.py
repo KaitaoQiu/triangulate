@@ -14,40 +14,21 @@
 
 """Main script."""
 
+import runpy
+import sys
+import traceback
+
 from absl import app
 from absl import flags
-from absl import logging
 from triangulate import core
+from triangulate import logging_utils
 
 Localiser = core.Localiser
 Environment = core.Environment
 
-_SUBJECT = flags.DEFINE_string(
-    "subject",
-    None,
-    help="the name of a buggy file",
-    required=True,
-    short_name="p",
-)
-_BUG_TRIGGERING_INPUT = flags.DEFINE_string(
-    "bug_triggering_input",
-    None,
-    required=True,
-    short_name="b",
-    help="a bug-triggering input",
-)
-_LOGLEVEL = flags.DEFINE_integer(
-    "loglevel",
-    0,
-    short_name="l",
-    help="Set logging level (default: INFO)",
-)
-_BUG_TRAP = flags.DEFINE_integer(
-    "bug_trap",
-    0,
-    short_name="t",
-    help="Program line at which the bug was observed",
-)
+print_color = logging_utils.print_color
+print_horizontal_line = logging_utils.print_horizontal_line
+
 # During burnin, the program stores outputs for later use to checking
 # whether injecting/executing probes has changed program semantics.
 _BURNIN = flags.DEFINE_integer(
@@ -70,41 +51,73 @@ _PROBE_OUTPUT_FILENAME = flags.DEFINE_string(
     "probe_output_filename",
     "__probeOutput.dmp",
     short_name="o",
-    help="maximum simulation steps",
+    help="Probe output filename",
 )
 
 
 def main(argv):
-  """Program entry point."""
+  if len(argv) < 2:
+    raise app.UsageError(
+        "Usage: triangulate [flags...] subject -- [subject_args...]"
+    )
 
-  if len(argv) < 1:
-    raise app.UsageError("Too few command-line arguments.")
+  subject = argv[1]
 
-  logging.set_verbosity(_LOGLEVEL.value)
+  # Rewrite `sys.argv` to absl-parsed `argv`.
+  # New `sys.argv`: <subject> <subject arguments>...
+  this_module_name = sys.argv[0]
+  sys.argv = argv[1:]
 
-  if not 0 <= _BURNIN.value < 1:
-    err_template = "Error: burnin period must fall into the interval [0,1)."
-    logging.error(err_template)
-    raise ValueError(err_template)
+  # Save flag values.
+  burnin = _BURNIN.value
+  max_steps = _MAX_STEPS.value
+  probe_output_filename = _PROBE_OUTPUT_FILENAME.value
 
-  if _SUBJECT.present:
-    subject = _SUBJECT.value
-  else:
-    subject = input("Please enter the name of the buggy program: ")
+  # Remove parsed flags to avoid flag name conflicts with the subject module.
+  flag_module_dict = flags.FLAGS.flags_by_module_dict()
+  fv = flags.FlagValues()
+  for flag in flag_module_dict[this_module_name]:
+    fv[flag.name] = flag
+  flags.FLAGS.remove_flag_values(fv)
 
-  env = Environment(
-      subject=subject,
-      bug_triggering_input=_BUG_TRIGGERING_INPUT.value,
-      bug_trap=_BUG_TRAP.value,
-      burnin=_BURNIN.value,
-      max_steps=_MAX_STEPS.value,
-      probe_output_filename=_PROBE_OUTPUT_FILENAME.value,
-      loglevel=_LOGLEVEL.value,
-  )
-  localiser = Localiser(env)
+  try:
+    print_color(prompt="Running", message=subject, color="blue")
+    print_horizontal_line()
 
-  while not env.terminate():
-    env.update(localiser.pick_action(env.state, env.reward()))
+    # Run Python program.
+    runpy.run_path(subject, run_name="__main__")
+
+    print_horizontal_line()
+    print_color(prompt="Success", message=subject, color="green")
+    print_color(
+        prompt="Triangulate did not run because no exception was thrown.",
+        color="green",
+    )
+  except Exception as e:  # pylint: disable=broad-except
+    print_horizontal_line()
+    print_color(prompt="Exception caught:", color="yellow")
+    _, _, tb = sys.exc_info()
+    traceback.print_tb(tb)
+    tb_info = traceback.extract_tb(tb)
+    exc_last_frame = tb_info[-1]
+    exc_lineno = exc_last_frame.lineno
+
+    try:
+      subject_argv = sys.argv
+      core.run(
+          subject=subject,
+          subject_argv=subject_argv,
+          bug_lineno=exc_lineno,
+          burnin=burnin,
+          max_steps=max_steps,
+          probe_output_filename=probe_output_filename,
+      )
+    except core.CouldNotResolveIllegalStateExpressionError:
+      print_color(
+          "Could not resolve illegal state expression from exception:",
+          color="red",
+      )
+      traceback.print_exception(e, limit=-1)
 
 
 if __name__ == "__main__":
