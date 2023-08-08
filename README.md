@@ -7,3 +7,27 @@ reinforcement learning.
 [![PyPI version](https://badge.fury.io/py/triangulate.svg)](https://badge.fury.io/py/triangulate)
 
 *This is not an officially supported Google product.*
+
+## Installation
+
+Run the following command to install Triangulate.
+
+```
+pip3 install -e .
+```
+
+## Usage
+
+Triangulate is designed to wrap a standard Python script invocation (a "subject" program), similar to `pdb`:
+
+```
+python3 -m triangulate.main [flags...] subject -- [subject_args...]
+```
+
+Under the hood, Triangulate runs `subject [subject_args...]`. If an exception is raised, Triangulate uses information from the exception to begin bug localization.
+
+## Examples
+
+```
+python3 -m triangulate.main --max_steps 5 -- triangulate/testdata/quoter.py -- --index 1
+```
