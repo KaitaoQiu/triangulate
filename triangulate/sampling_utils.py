@@ -14,7 +14,8 @@
 
 """Sampling utilities."""
 
-from typing import List
+from collections.abc import Sequence
+
 import numpy as np
 
 rng = np.random.default_rng(seed=654)
@@ -43,7 +44,7 @@ def sample_zipfian(
 
 
 def sample_wo_replacement_uniform(
-    num_samples: int, support: List[int]
+    num_samples: int, support: Sequence[int]
 ) -> np.ndarray:
   """Uniformly sample num_samples from [1, suppport].
 

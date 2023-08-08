@@ -203,8 +203,9 @@ class LineVisitor(ast.NodeVisitor):
       self.generic_visit(node)
 
 
-def get_insertion_points(tree: ast.AST) -> list[int]:
-  # Collect insertion points
+def get_insertion_points(tree: ast.AST) -> Sequence[int]:
+  """Returns all valid line numbers for inserting probes."""
+  # Collect insertion points.
   visitor = LineVisitor()
   visitor.visit(tree)
   insertion_points = visitor.insertion_points
@@ -216,7 +217,7 @@ def get_insertion_points(tree: ast.AST) -> list[int]:
   #
   # For checking probe validity: can keep track of all locals() names at each
   # probe location candidate, to see if all probed names are within scope.
-  insertion_points = [x for x in insertion_points if x >= 0]
+  insertion_points = tuple(x for x in insertion_points if x >= 0)
 
   if not insertion_points:
     raise ValueError("No valid insertion points found.")
@@ -225,7 +226,7 @@ def get_insertion_points(tree: ast.AST) -> list[int]:
 
 
 class IdentifierExtractor(ast.NodeVisitor):
-  """This visitor extracts variables from an AST."""
+  """Visitor that extracts variable identifiers from an AST."""
 
   def __init__(self):
     self.identifiers = set()
@@ -240,9 +241,9 @@ class IdentifierExtractor(ast.NodeVisitor):
       self.visit(arg)
 
 
-def extract_identifiers(expr: str) -> set[str]:
+def extract_identifiers(expr: str) -> Sequence[str]:
   """Parse a Python expression and extract its identifiers."""
   root = ast.parse(expr)
   visitor = IdentifierExtractor()
   visitor.visit(root)
-  return visitor.identifiers
+  return sorted(visitor.identifiers)

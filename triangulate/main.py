@@ -31,27 +31,20 @@ print_horizontal_line = logging_utils.print_horizontal_line
 
 # During burnin, the program stores outputs for later use to checking
 # whether injecting/executing probes has changed program semantics.
-_BURNIN = flags.DEFINE_integer(
-    "burnin",
-    0,
+_BURNIN_STEPS = flags.DEFINE_integer(
+    "burnin_steps",
+    None,
     short_name="n",
     help=(
-        "Percentage of max_steps to use as burnin steps "
-        "to tolerate nondeterministic buggy programs; "
-        "zero (the default) disables burnin."
+        "Percentage of max_steps to use as burnin steps to tolerate "
+        "nondeterministic buggy programs; zero (the default) disables burnin."
     ),
 )
 _MAX_STEPS = flags.DEFINE_integer(
     "max_steps",
-    10,
+    None,
     short_name="m",
     help="maximum simulation steps",
-)
-_PROBE_OUTPUT_FILENAME = flags.DEFINE_string(
-    "probe_output_filename",
-    "__probeOutput.dmp",
-    short_name="o",
-    help="Probe output filename",
 )
 
 
@@ -69,9 +62,8 @@ def main(argv):
   sys.argv = argv[1:]
 
   # Save flag values.
-  burnin = _BURNIN.value
+  burnin_steps = _BURNIN_STEPS.value
   max_steps = _MAX_STEPS.value
-  probe_output_filename = _PROBE_OUTPUT_FILENAME.value
 
   # Remove parsed flags to avoid flag name conflicts with the subject module.
   flag_module_dict = flags.FLAGS.flags_by_module_dict()
@@ -108,9 +100,8 @@ def main(argv):
           subject=subject,
           subject_argv=subject_argv,
           bug_lineno=exc_lineno,
-          burnin=burnin,
+          burnin_steps=burnin_steps,
           max_steps=max_steps,
-          probe_output_filename=probe_output_filename,
       )
     except core.CouldNotResolveIllegalStateExpressionError:
       print_color(
