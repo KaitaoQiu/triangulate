@@ -68,21 +68,17 @@ Today's inspirational quote:
       expected_output: str | re.Pattern[str],
       subject_argv: Sequence[str] = (),
       bug_lineno: int | None = None,
-      burnin: int = 100,
-      max_steps: int = 100,
-      probe_output_filename: str = '',
+      burnin_steps: int = 0,
+      max_steps: int = 10,
   ):
     subject = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
         subject=subject,
         subject_argv=(subject,) + tuple(subject_argv),
         bug_lineno=bug_lineno,
-        burnin=burnin,
+        burnin_steps=burnin_steps,
         max_steps=max_steps,
-        probe_output_filename=probe_output_filename,
     )
-    # TODO(etbarr): Test `execute_subject` and `update` methods.
-    # NOTE(danielzheng): Change printing to be on command line.
     output = env.execute_subject()
     env.update(action=action)
     # If output is a regex, check regex match.
@@ -106,18 +102,16 @@ class LocaliserTest(parameterized.TestCase):
       subject: str,
       subject_argv: Sequence[str] = (),
       bug_lineno: int | None = None,
-      burnin: int = 10,
+      burnin_steps: int = 10,
       max_steps: int = 100,
-      probe_output_filename: str = 'probe_output.txt',
   ):
     subject = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
         subject=subject,
         subject_argv=subject_argv,
         bug_lineno=bug_lineno,
-        burnin=burnin,
+        burnin_steps=burnin_steps,
         max_steps=max_steps,
-        probe_output_filename=probe_output_filename,
     )
     localiser = core.Localiser(env)
     localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
