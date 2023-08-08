@@ -12,40 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for third_party.py.triangulate."""
+"""Tests for ast_utils."""
 
 import ast
 from collections.abc import Sequence
-import os
 
 from absl.testing import absltest
 from absl.testing import parameterized
 
 from triangulate import ast_utils
-
-TESTDATA_DIRECTORY = os.path.join(
-    absltest.get_default_test_srcdir(),
-    "triangulate/testdata",
-)
-TEST_PROGRAM_PATH = os.path.join(TESTDATA_DIRECTORY, "quoter.py")
-
-
-class ASTTest(absltest.TestCase):
-
-  def test_get_insertion_points(self):
-    with open(TEST_PROGRAM_PATH, "r", encoding="utf-8") as f:
-      source = f.read()
-    tree = ast.parse(source)
-    insertion_points = ast_utils.get_insertion_points(tree)
-    print(insertion_points)  # Debugging, not sure of the current value
-    # TODO(etbarr): Verify whether `insertion_points` is correct.
-    self.assertLen(insertion_points, 7)
-
-  def test_extract_identifiers(self):
-    test_expr = "x + y * foo(z,c)"
-    test_expr_fv = set(["c", "x", "y", "z"])
-    fv = ast_utils.extract_identifiers(test_expr)
-    self.assertEqual(test_expr_fv, set(fv))
 
 
 EXAMPLE_PROGRAM = """\
@@ -54,6 +29,21 @@ def add_one(x):
     assert x == 1
     return x + 1
 """.strip()
+
+
+class ASTTest(absltest.TestCase):
+
+  def test_get_insertion_points(self):
+    tree = ast.parse(EXAMPLE_PROGRAM)
+    insertion_line_numbers = ast_utils.get_insertion_points(tree)
+    # Every line except the debugging probe call is an insertion point.
+    self.assertSequenceEqual(insertion_line_numbers, [0, 2, 3])
+
+  def test_extract_identifiers(self):
+    test_expr = "x + y * foo(z,c)"
+    test_expr_fv = set(["c", "x", "y", "z"])
+    fv = ast_utils.extract_identifiers(test_expr)
+    self.assertEqual(test_expr_fv, set(fv))
 
 
 class ASTNodeSelection(parameterized.TestCase):
