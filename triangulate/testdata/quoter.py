@@ -72,7 +72,7 @@ def main(index: int | None = None, seed: int = 0):
 
   # Assert that the first quote was selected.
   first_quote = ORDERED_QUOTES[0][0]
-  assert quote == first_quote, f"Quote {repr(first_quote)} was not selected."
+  assert quote == first_quote, "The first quote was not selected."
 
 
 if __name__ == "__main__":

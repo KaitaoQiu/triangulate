@@ -14,7 +14,9 @@
 
 """Tests for core."""
 
+from collections.abc import Sequence
 import os
+import re
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -30,10 +32,6 @@ TESTDATA_DIRECTORY = os.path.join(
     absltest.get_default_test_srcdir(),
     'triangulate/testdata',
 )
-SUBJECT_FILENAME = 'quoter.py'
-SUBJECT_FILEPATH = os.path.join(TESTDATA_DIRECTORY, SUBJECT_FILENAME)
-with open(SUBJECT_FILEPATH, 'r', encoding='utf8') as f:
-  SUBJECT_CONTENT = f.read()
 
 ################################################################################
 # Test cases
@@ -44,50 +42,55 @@ class EnvironmentTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
-          testcase_name='test_a',
-          subject=SUBJECT_FILEPATH,
-          subject_argv='42',
+          testcase_name='test_quoter_index_0',
+          subject='quoter.py',
+          subject_argv=['--index', '0'],
           action='<placeholder>',
           expected_output="""\
+Arguments: index = 0, seed = 0
 Today's inspirational quote:
-"Believe you can and you're halfway there." - Theodore Roosevelt
+"It does not matter how slowly you go as long as you do not stop." - Confucius
 """,
       ),
       dict(
-          testcase_name='test_b',
-          subject=SUBJECT_FILEPATH,
-          subject_argv='42',
+          testcase_name='test_quoter_no_argv',
+          subject='quoter.py',
           action='<placeholder>',
-          expected_output="""\
-Today's inspirational quote:
-"Believe you can and you're halfway there." - Theodore Roosevelt
-""",
+          expected_output=re.compile(
+              'AssertionError: The first quote was not selected.'
+          ),
       ),
   )
   def test_execute_and_update(
       self,
       subject: str,
-      subject_argv: str,
       action: str,
-      expected_output: str,
+      expected_output: str | re.Pattern[str],
+      subject_argv: Sequence[str] = (),
       bug_lineno: int | None = None,
       burnin: int = 100,
       max_steps: int = 100,
       probe_output_filename: str = '',
   ):
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
         subject=subject,
-        subject_argv=subject_argv,
+        subject_argv=(subject,) + tuple(subject_argv),
         bug_lineno=bug_lineno,
         burnin=burnin,
         max_steps=max_steps,
         probe_output_filename=probe_output_filename,
     )
     # TODO(etbarr): Test `execute_subject` and `update` methods.
+    # NOTE(danielzheng): Change printing to be on command line.
     output = env.execute_subject()
-    print(output)
     env.update(action=action)
-    self.assertEqual(output, expected_output)
+    # If output is a regex, check regex match.
+    if isinstance(expected_output, re.Pattern):
+      self.assertRegex(output, expected_output)
+    # Otherwise, check string equality.
+    else:
+      self.assertEqual(output, expected_output)
 
 
 class LocaliserTest(parameterized.TestCase):
@@ -95,19 +98,19 @@ class LocaliserTest(parameterized.TestCase):
   @parameterized.named_parameters(
       dict(
           testcase_name='test_a',
-          subject=SUBJECT_FILEPATH,
-          subject_argv='5',
+          subject='quoter.py',
       ),
   )
   def test_generate_probes_random(
       self,
       subject: str,
-      subject_argv: str,
+      subject_argv: Sequence[str] = (),
       bug_lineno: int | None = None,
       burnin: int = 10,
       max_steps: int = 100,
       probe_output_filename: str = 'probe_output.txt',
   ):
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
     env = core.Environment(
         subject=subject,
         subject_argv=subject_argv,

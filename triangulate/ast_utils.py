@@ -186,11 +186,11 @@ class LineVisitor(ast.NodeVisitor):
       return
     elif hasattr(node, "lineno"):
       # TODO(danielzheng): Log probe candidates.
-      # print('Found node with lineno', node.lineno, node.end_lineno, node)
+      # print("Found node with lineno", node.lineno, node.end_lineno, node)
       # print()
-      # print('  ', repr(ast.unparse(node)))
-      # print('  ', ast.dump(node))
-      # print('  ', IsProbeStatement.matches(node))
+      # print("  ", repr(ast.unparse(node)))
+      # print("  ", ast.dump(node))
+      # print("  ", IsProbeStatement.matches(node))
       # print()
       # Skip probe statements
       if IsProbeStatement.matches(node):

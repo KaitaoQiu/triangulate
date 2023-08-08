@@ -431,34 +431,27 @@ class Environment:
     subject_output = self.execute_subject()
     self.subject_output.add(subject_output)
 
-  # TODO(etbarr) Gather and pass a subject's parameters to it.
   def execute_subject(self) -> str:
     """Execute an instrumented version of the buggy program.
 
     Returns:
-      Returns the subject's output, concatenating standard and error.
-
-    Raises:
-      CallProcessError if subprocess.run fails.
+      Returns the subject's output, concatenating stdout and stderr.
     """
     assert self.subject_with_probes is not None
     self.subject_with_probes.seek(0)
 
     python_source = self.subject_with_probes.read()
-    try:
-      output = instrumentation_utils.run_with_instrumentation(
-          python_source=python_source,
-          filename=self.subject,
-      )
-      # TODO(danielzheng): Do logging.
-      print_color("Subject output:")
-      print_horizontal_line()
-      print(output)
-      print_horizontal_line()
-      return output
-    except Exception as e:
-      logging.error("Error: %s", e)
-      raise e
+    output = instrumentation_utils.run_with_instrumentation(
+        python_source=python_source,
+        argv=self.subject_argv,
+    )
+
+    # TODO(danielzheng): Do logging.
+    print_color("Subject output:")
+    print_horizontal_line()
+    print(output)
+    print_horizontal_line()
+    return output
 
   def reward(self) -> int:
     """Return reward for current state.
