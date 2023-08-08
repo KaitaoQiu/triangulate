@@ -45,7 +45,6 @@ class EnvironmentTest(parameterized.TestCase):
           testcase_name='test_quoter_index_0',
           subject='quoter.py',
           subject_argv=['--index', '0'],
-          action='<placeholder>',
           expected_output="""\
 Arguments: index = 0, seed = 0
 Today's inspirational quote:
@@ -55,7 +54,6 @@ Today's inspirational quote:
       dict(
           testcase_name='test_quoter_no_argv',
           subject='quoter.py',
-          action='<placeholder>',
           expected_output=re.compile(
               'AssertionError: The first quote was not selected.'
           ),
@@ -64,8 +62,8 @@ Today's inspirational quote:
   def test_execute_and_update(
       self,
       subject: str,
-      action: str,
       expected_output: str | re.Pattern[str],
+      probes: core.Probes = (),
       subject_argv: Sequence[str] = (),
       bug_lineno: int | None = None,
       burnin_steps: int = 0,
@@ -80,7 +78,7 @@ Today's inspirational quote:
         max_steps=max_steps,
     )
     output = env.execute_subject()
-    env.update(action=action)
+    env.step(action=core.AddProbes(probes=probes))
     # If output is a regex, check regex match.
     if isinstance(expected_output, re.Pattern):
       self.assertRegex(output, expected_output)
@@ -113,7 +111,7 @@ class LocaliserTest(parameterized.TestCase):
         burnin_steps=burnin_steps,
         max_steps=max_steps,
     )
-    localiser = core.Localiser(env)
+    localiser = core.Localiser()
     localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
 
 

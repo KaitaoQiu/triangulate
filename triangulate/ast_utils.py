@@ -16,7 +16,7 @@
 
 import abc
 import ast
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Sequence, Set
 import dataclasses
 from typing import cast, Callable, Type
 
@@ -171,17 +171,17 @@ class LineVisitor(ast.NodeVisitor):
   """Visit intra-statement lines in a Python script.
 
   Attributes:
-    insertion_points:
+    insertion_points: Set of line numbers that are valid probe insertion points.
   """
 
   def __init__(self):
-    self.insertion_points = []
+    self.insertion_points = set()
 
   def visit(self, node: ast.AST) -> None:
-    # Skip multiline string literals
+    # Skip multiline string literals.
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
       return
-    # Skip imports
+    # Skip imports.
     elif isinstance(node, ast.Import):
       return
     elif hasattr(node, "lineno"):
@@ -196,19 +196,18 @@ class LineVisitor(ast.NodeVisitor):
       if IsProbeStatement.matches(node):
         return
       # TODO(danielzheng): Skip AST nodes that have already been probed.
-      self.insertion_points.append(node.lineno - 1)
+      self.insertion_points.add(node.lineno - 1)
+    # Recursively visit declarations.
     if isinstance(
         node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef, ast.Module)
     ):
       self.generic_visit(node)
 
 
-def get_insertion_points(tree: ast.AST) -> Sequence[int]:
+def get_insertion_points(tree: ast.AST) -> Set[int]:
   """Returns all valid line numbers for inserting probes."""
   # Collect insertion points.
-  visitor = LineVisitor()
-  visitor.visit(tree)
-  insertion_points = visitor.insertion_points
+
   # TODO(danielzheng): To be robust, insertion point needs to be
   # dominance-aware. Maybe we can use dynamic analysis (e.g. tracing with dummy
   # values) to find valid insertion points along the execution path. Need a
@@ -217,11 +216,12 @@ def get_insertion_points(tree: ast.AST) -> Sequence[int]:
   #
   # For checking probe validity: can keep track of all locals() names at each
   # probe location candidate, to see if all probed names are within scope.
-  insertion_points = tuple(x for x in insertion_points if x >= 0)
 
+  visitor = LineVisitor()
+  visitor.visit(tree)
+  insertion_points = visitor.insertion_points
   if not insertion_points:
     raise ValueError("No valid insertion points found.")
-
   return insertion_points
 
 

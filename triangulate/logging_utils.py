@@ -29,7 +29,7 @@ def print_color(
   attrs = []
   if bold:
     attrs.append("bold")
-  if message:
+  if message != "":
     prompt = f"{prompt}: "
   prompt_colored = termcolor.colored(prompt, color=color, attrs=attrs)
   if message:
