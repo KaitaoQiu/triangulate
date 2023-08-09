@@ -57,7 +57,7 @@ def sample_wo_replacement_uniform(
   """
   if num_samples > len(support):
     raise ValueError(
-        "When sampling without replacement, the number of samples"
-        " cannot exceed the cardinality of the set."
+        "When sampling without replacement, the number of samples "
+        "cannot exceed the cardinality of the set."
     )
   return rng.choice(support, size=num_samples, replace=False)

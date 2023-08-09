@@ -26,7 +26,7 @@ from typing import Any
 
 from triangulate import logging_utils
 
-print_color = logging_utils.print_color
+CONSOLE = logging_utils.CONSOLE
 
 # A unique name for the probing function.
 PROBE_FUNCTION_NAME = "triangulate_probe"
@@ -49,9 +49,8 @@ def probe(variable_names: Sequence[str], locals_dict: Mapping[str, Any]):
     full_probe_str.write("\n")
   if not full_probe_str.getvalue():
     return
-  print_color(
-      prompt=f"Probing: {caller.filename}:{caller.lineno}",
-      color="blue",
+  CONSOLE.print(
+      f"Probing: {caller.filename}:{caller.lineno}", style="bold blue"
   )
   print(full_probe_str.getvalue(), end="")
 
@@ -77,7 +76,7 @@ def run_with_instrumentation(
         runpy.run_path(f.name, init_globals=exec_globals, run_name="__main__")
     except Exception as e:  # pylint:disable=broad-except
       # Print exception from the executed program.
-      print_color("Exception raised:", color="yellow", bold=False)
+      CONSOLE.print("Exception raised:", style="yellow")
       traceback.print_exception(e.__context__ or e)
     finally:
       sys.argv = old_argv
