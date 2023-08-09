@@ -41,6 +41,20 @@ print_panel = logging_utils.print_panel
 
 
 @dataclasses.dataclass
+class LineNumberOutOfBounds(Exception):
+  """Line number is out of bounds for program."""
+
+  code: str
+  lineno: int
+
+  def __str__(self) -> str:
+    return (
+        f"Line number {self.lineno} is out of bounds for code:\n"
+        f"{prepend_line_numbers(self.code)}"
+    )
+
+
+@dataclasses.dataclass
 class CouldNotResolveIllegalStateExpressionError(Exception):
   """Illegal state expression could not be resolved for code and line number."""
 
@@ -103,7 +117,7 @@ class State:
 
     if self.bug_lineno is not None:
       if not 0 <= self.bug_lineno < len(self.code_lines):
-        raise ValueError("Bug line number out of bounds")
+        raise LineNumberOutOfBounds(self.code, self.bug_lineno)
 
     illegal_state_expression = ast_utils.extract_illegal_state_expression(
         self.code, self.bug_lineno
