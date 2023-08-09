@@ -14,20 +14,26 @@
 
 """Main script."""
 
+import contextlib
+import io
 import runpy
 import sys
 import traceback
+from types import TracebackType
+from typing import TypeAlias
 
 from absl import app
 from absl import flags
 from triangulate import core
 from triangulate import logging_utils
 
+ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
+
 Localiser = core.Localiser
 Environment = core.Environment
 
-print_color = logging_utils.print_color
-print_horizontal_line = logging_utils.print_horizontal_line
+CONSOLE = logging_utils.CONSOLE
+print_panel = logging_utils.print_panel
 
 # During burnin, the program stores outputs for later use to checking
 # whether injecting/executing probes has changed program semantics.
@@ -46,6 +52,39 @@ _MAX_STEPS = flags.DEFINE_integer(
     short_name="m",
     help="maximum simulation steps",
 )
+
+
+def run_from_exception(
+    exc_info: ExcInfo,
+    subject: str,
+    burnin_steps: int | None,
+    max_steps: int | None,
+    # exception: Exception,
+):
+  CONSOLE.print("Exception caught:", style="bold yellow")
+  _, exc_value, tb = exc_info
+  if exc_value is None:
+    raise ValueError("No exception raised")
+  traceback.print_tb(tb)
+  tb_info = traceback.extract_tb(tb)
+  exc_last_frame = tb_info[-1]
+  exc_lineno = exc_last_frame.lineno
+
+  try:
+    subject_argv = sys.argv
+    core.run(
+        subject=subject,
+        subject_argv=subject_argv,
+        bug_lineno=exc_lineno,
+        burnin_steps=burnin_steps,
+        max_steps=max_steps,
+    )
+  except core.CouldNotResolveIllegalStateExpressionError:
+    CONSOLE.print(
+        "Could not resolve illegal state expression from exception:",
+        style="bold red",
+    )
+    traceback.print_exception(exc_value, limit=-1)
 
 
 def main(argv):
@@ -72,43 +111,34 @@ def main(argv):
     fv[flag.name] = flag
   flags.FLAGS.remove_flag_values(fv)
 
+  buffer = io.StringIO()
+  exc_info = None
   try:
-    print_color(prompt="Running", message=subject, color="blue")
-    print_horizontal_line()
+    CONSOLE.print(rf"[blue][b]Running:[/b][/blue] {subject}")
+    with (
+        contextlib.redirect_stdout(buffer),
+        contextlib.redirect_stderr(buffer),
+    ):
+      runpy.run_path(subject, run_name="__main__")
+  except:  # pylint: disable=bare-except
+    exc_info = sys.exc_info()
+  finally:
+    print_panel(buffer.getvalue().removesuffix("\n"), title="Subject output")
 
-    # Run Python program.
-    runpy.run_path(subject, run_name="__main__")
-
-    print_horizontal_line()
-    print_color(prompt="Success", message=subject, color="green")
-    print_color(
-        prompt="Triangulate did not run because no exception was thrown.",
-        color="green",
+  if exc_info is not None:
+    run_from_exception(
+        exc_info=exc_info,
+        subject=subject,
+        burnin_steps=burnin_steps,
+        max_steps=max_steps,
     )
-  except Exception as e:  # pylint: disable=broad-except
-    print_horizontal_line()
-    print_color(prompt="Exception caught:", color="yellow")
-    _, _, tb = sys.exc_info()
-    traceback.print_tb(tb)
-    tb_info = traceback.extract_tb(tb)
-    exc_last_frame = tb_info[-1]
-    exc_lineno = exc_last_frame.lineno
+    return
 
-    try:
-      subject_argv = sys.argv
-      core.run(
-          subject=subject,
-          subject_argv=subject_argv,
-          bug_lineno=exc_lineno,
-          burnin_steps=burnin_steps,
-          max_steps=max_steps,
-      )
-    except core.CouldNotResolveIllegalStateExpressionError:
-      print_color(
-          "Could not resolve illegal state expression from exception:",
-          color="red",
-      )
-      traceback.print_exception(e, limit=-1)
+  CONSOLE.print(rf"[green][b]Success:[/b][/green] {subject}")
+  CONSOLE.print(
+      "Triangulate did not run because no exception was thrown.",
+      style="bold green",
+  )
 
 
 if __name__ == "__main__":

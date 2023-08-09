@@ -14,30 +14,18 @@
 
 """Printing and logging utilities."""
 
-import shutil
-import termcolor
+from typing import Any
+
+from rich.console import Console
+from rich.panel import Panel
 
 
-def print_color(
-    prompt: str,
-    message: str = "",
-    *,
-    color: int | str | None = None,
-    bold: bool = True,
-):
-  """Prints a prompt with optional message and formatting options."""
-  attrs = []
-  if bold:
-    attrs.append("bold")
-  if message != "":
-    prompt = f"{prompt}: "
-  prompt_colored = termcolor.colored(prompt, color=color, attrs=attrs)
-  if message:
-    print(f"{prompt_colored}{message}")
-  else:
-    print(prompt_colored)
+CONSOLE = Console()
 
 
-def print_horizontal_line():
-  terminal_size = shutil.get_terminal_size()
-  print("\u2500" * terminal_size.columns)
+def print_panel(renderable: Any, title: str = ""):
+  CONSOLE.print(Panel(renderable, title=title))
+
+
+def print_horizontal_line(title: str = ""):
+  CONSOLE.rule(title=title)

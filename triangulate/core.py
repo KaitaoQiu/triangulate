@@ -22,14 +22,18 @@ import math
 import tempfile
 
 from absl import logging
+from rich.syntax import Syntax
+
 from triangulate import ast_utils
 from triangulate import instrumentation_utils
 from triangulate import logging_utils
 from triangulate import sampling_utils
 
 PROBE_FUNCTION_NAME = instrumentation_utils.PROBE_FUNCTION_NAME
-print_color = logging_utils.print_color
+
+CONSOLE = logging_utils.CONSOLE
 print_horizontal_line = logging_utils.print_horizontal_line
+print_panel = logging_utils.print_panel
 
 ################################################################################
 # Utilities
@@ -109,7 +113,7 @@ class State:
           self.code, self.bug_lineno
       )
 
-    print_color("Illegal state expression resolved:", color="yellow")
+    CONSOLE.print("Illegal state expression resolved", style="bold yellow")
     print(illegal_state_expression)
     self.set_illegal_state_expression(illegal_state_expression)
     focal_expression = self.illegal_state_expression
@@ -195,21 +199,27 @@ class AddProbes(Action):
 
   def update(self, state: State) -> State:
     """Updates state with new probes."""
-    print_color("Adding probes:")
+    CONSOLE.print("Adding probes:")
     for probe in self.probes:
       print(f"  {probe.line_number}: {probe.statement}")
 
-    # TODO(danielzheng): Optimize this.
     new_probes = tuple(
         sorted(state.probes + self.probes, key=lambda probe: probe.line_number)
     )
     new_state = dataclasses.replace(state, probes=new_probes)
 
-    # TODO(danielzheng): Do logging.
-    print_color("New state with probes:")
-    print_horizontal_line()
-    print(prepend_line_numbers(new_state.render_code()))
-    print_horizontal_line()
+    # Print rendered code.
+    rendered_code = new_state.render_code()
+    print_panel(
+        Syntax(
+            rendered_code,
+            lexer="python",
+            theme="ansi_light",
+            line_numbers=True,
+            start_line=0,
+        ),
+        title="New state with probes",
+    )
     return new_state
 
 
@@ -366,12 +376,10 @@ class Environment:
           f"{self.subject} to be instrumented with probes."
       ) from e
     self.state = State(code=subject_code, bug_lineno=bug_lineno)
-    print("Initial state:")
-    print(self.state)
-    subject_output = self.execute_subject()
+    subject_output = self.execute_subject(print_output=False)
     self.subject_output.add(subject_output)
 
-  def execute_subject(self) -> str:
+  def execute_subject(self, print_output: bool = True) -> str:
     """Executes an instrumented version of the subject program.
 
     Returns:
@@ -385,10 +393,8 @@ class Environment:
     )
 
     # TODO(danielzheng): Do logging.
-    print_color("Subject output:")
-    print_horizontal_line()
-    print(output)
-    print_horizontal_line()
+    if print_output:
+      print_panel(output.removesuffix("\n"), title="Subject output")
     return output
 
   def step(self, action: Action) -> None:
@@ -447,10 +453,10 @@ def run(
   )
   agent = Localiser()
   while not env.terminate():
-    print_color(f"Step {env.steps}:", color="blue")
+    CONSOLE.print(f"Step {env.steps}:", style="bold blue")
     action = agent.pick_action(env.state, env.reward())
     if isinstance(action, Halt):
-      print_color("Stopping due to halt action.", color="blue")
+      CONSOLE.print("Stopping due to halt action.", style="bold blue")
       break
     env.step(action)
-  print_color(f"Done: {env.steps} steps performed.", color="blue")
+  CONSOLE.print(f"Done: {env.steps} steps performed.", style="bold blue")
