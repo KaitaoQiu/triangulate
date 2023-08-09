@@ -86,6 +86,26 @@ Today's inspirational quote:
     else:
       self.assertEqual(output, expected_output)
 
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='test_multifile_main',
+          subject='multifile_example/main.py',
+      ),
+  )
+  def test_could_not_resolve_illegal_state_expression(
+      self,
+      subject: str,
+      subject_argv: Sequence[str] = (),
+  ):
+    """Known unsupported cases for illegal state expression resolution."""
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
+    with self.assertRaises(core.CouldNotResolveIllegalStateExpressionError):
+      _ = core.Environment(
+          subject=subject,
+          subject_argv=(subject,) + tuple(subject_argv),
+          bug_lineno=None,
+      )
+
 
 class LocaliserTest(parameterized.TestCase):
 

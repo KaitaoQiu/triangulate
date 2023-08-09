@@ -338,7 +338,7 @@ class Environment:
       self,
       subject: str,
       subject_argv: Sequence[str],
-      bug_lineno: int,
+      bug_lineno: int | None = None,
       burnin_steps: int | None = None,
       max_steps: int | None = None,
   ):
