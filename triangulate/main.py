@@ -14,11 +14,7 @@
 
 """Main script."""
 
-import contextlib
-import io
-import runpy
 import sys
-import traceback
 from types import TracebackType
 from typing import TypeAlias
 
@@ -54,90 +50,35 @@ _MAX_STEPS = flags.DEFINE_integer(
 )
 
 
-def run_from_exception(
-    exc_info: ExcInfo,
-    subject: str,
-    burnin_steps: int | None,
-    max_steps: int | None,
-    # exception: Exception,
-):
-  CONSOLE.print("Exception caught:", style="bold yellow")
-  _, exc_value, tb = exc_info
-  if exc_value is None:
-    raise ValueError("No exception raised")
-  traceback.print_tb(tb)
-  tb_info = traceback.extract_tb(tb)
-  exc_last_frame = tb_info[-1]
-  exc_lineno = exc_last_frame.lineno
-
-  try:
-    subject_argv = sys.argv
-    core.run(
-        subject=subject,
-        subject_argv=subject_argv,
-        bug_lineno=exc_lineno,
-        burnin_steps=burnin_steps,
-        max_steps=max_steps,
-    )
-  except core.CouldNotResolveIllegalStateExpressionError:
-    CONSOLE.print(
-        "Could not resolve illegal state expression from exception:",
-        style="bold red",
-    )
-    traceback.print_exception(exc_value, limit=-1)
-
-
 def main(argv):
   if len(argv) < 2:
     raise app.UsageError(
         "Usage: triangulate [flags...] subject -- [subject_args...]"
     )
 
-  subject = argv[1]
-
-  # Rewrite `sys.argv` to absl-parsed `argv`.
-  # New `sys.argv`: <subject> <subject arguments>...
-  this_module_name = sys.argv[0]
-  sys.argv = argv[1:]
-
   # Save flag values.
   burnin_steps = _BURNIN_STEPS.value
   max_steps = _MAX_STEPS.value
 
+  # Get subject program and arguments.
+  subject = argv[1]
+  subject_argv = argv[1:]
+
   # Remove parsed flags to avoid flag name conflicts with the subject module.
+  # Note: there might be a better way to do this (avoid flags from propagating
+  # to subject program).
   flag_module_dict = flags.FLAGS.flags_by_module_dict()
   fv = flags.FlagValues()
+  this_module_name = sys.argv[0]
   for flag in flag_module_dict[this_module_name]:
     fv[flag.name] = flag
   flags.FLAGS.remove_flag_values(fv)
 
-  buffer = io.StringIO()
-  exc_info = None
-  try:
-    CONSOLE.print(rf"[blue][b]Running:[/b][/blue] {subject}")
-    with (
-        contextlib.redirect_stdout(buffer),
-        contextlib.redirect_stderr(buffer),
-    ):
-      runpy.run_path(subject, run_name="__main__")
-  except Exception:  # pylint: disable=broad-except
-    exc_info = sys.exc_info()
-  finally:
-    print_panel(buffer.getvalue().removesuffix("\n"), title="Subject output")
-
-  if exc_info is not None:
-    run_from_exception(
-        exc_info=exc_info,
-        subject=subject,
-        burnin_steps=burnin_steps,
-        max_steps=max_steps,
-    )
-    return
-
-  CONSOLE.print(rf"[green][b]Success:[/b][/green] {subject}")
-  CONSOLE.print(
-      "Triangulate did not run because no exception was thrown.",
-      style="bold green",
+  core.run(
+      subject,
+      subject_argv,
+      burnin_steps=burnin_steps,
+      max_steps=max_steps,
   )
 
 

@@ -16,7 +16,6 @@
 
 import argparse
 import random
-import sys
 
 
 # Define a dictionary of quotes and their attributions
