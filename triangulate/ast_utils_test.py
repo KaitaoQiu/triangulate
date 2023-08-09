@@ -37,7 +37,7 @@ class ASTTest(absltest.TestCase):
     tree = ast.parse(EXAMPLE_PROGRAM)
     insertion_line_numbers = ast_utils.get_insertion_points(tree)
     # Every line except the debugging probe call is an insertion point.
-    self.assertSequenceEqual(insertion_line_numbers, [0, 2, 3])
+    self.assertSetEqual(insertion_line_numbers, {0, 2, 3})
 
   def test_extract_identifiers(self):
     test_expr = "x + y * foo(z,c)"

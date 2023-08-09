@@ -20,7 +20,6 @@ from collections.abc import Sequence
 import dataclasses
 import math
 import tempfile
-from typing import Any, IO
 
 from absl import logging
 from triangulate import ast_utils
@@ -72,6 +71,10 @@ class Probe:
   statement: str
 
 
+Probes = tuple[Probe, ...]
+
+
+@dataclasses.dataclass
 class State:
   """Bug localization state.
 
@@ -80,37 +83,37 @@ class State:
     code_lines: The source code lines in the current agent window.
     illegal_state_expression: The illegal state expression.
     focal_expression: The current expression under focus for bug localization.
-    subject_with_probes: File descriptor of the subject program.
     probes: Probe statements, added by an agent.
   """
 
-  def __init__(
-      self,
-      subject_with_probes: IO[str],
-      bug_lineno: int | None = None,
-      probes: Sequence[Probe] = (),
-  ):
-    self.code = subject_with_probes.read()
-    self.code_lines = self.code.splitlines(keepends=True)
-    if bug_lineno is not None:
-      assert (
-          0 <= bug_lineno < len(self.code_lines)
-      ), "Bug line number out of bounds"
+  code: str
+  bug_lineno: int | None = None
+  probes: Probes = ()
+
+  code_lines: Sequence[str] = dataclasses.field(init=False)
+  illegal_state_expression: str = dataclasses.field(init=False)
+  focal_expression: str = dataclasses.field(init=False)
+
+  def __post_init__(self):
+    self.code_lines = tuple(self.code.splitlines(keepends=True))
+
+    if self.bug_lineno is not None:
+      if not 0 <= self.bug_lineno < len(self.code_lines):
+        raise ValueError("Bug line number out of bounds")
 
     illegal_state_expression = ast_utils.extract_illegal_state_expression(
-        self.code, bug_lineno
+        self.code, self.bug_lineno
     )
     if illegal_state_expression is None:
-      raise CouldNotResolveIllegalStateExpressionError(self.code, bug_lineno)
+      raise CouldNotResolveIllegalStateExpressionError(
+          self.code, self.bug_lineno
+      )
+
     print_color("Illegal state expression resolved:", color="yellow")
     print(illegal_state_expression)
     self.set_illegal_state_expression(illegal_state_expression)
     focal_expression = self.illegal_state_expression
     self.set_focal_expression(focal_expression)
-
-    self.subject_with_probes = subject_with_probes
-    self.subject_with_probes.seek(0)
-    self.probes = probes
 
   def set_illegal_state_expression(self, illegal_state_expression: str) -> None:
     try:
@@ -138,16 +141,172 @@ class State:
     """Return identifiers in the illegal state expression."""
     return ast_utils.extract_identifiers(self.illegal_state_expression)
 
+  def render_code(self) -> str:
+    """Renders the code with probes inserted."""
+    # TODO(danielzheng): Rewrite probe insertion using AST to avoid manual
+    # indentation management.
+    new_code_lines = list(self.code_lines)
+    for probe in reversed(self.probes):
+      offset = probe.line_number
+      preceding_line = self.code_lines[offset]
+      indentation = " " * leading_whitespace_count(preceding_line)
+      probe_statement = indentation + probe.statement
+      new_code_lines.insert(offset, probe_statement)
+    return "".join(new_code_lines)
+
   def __str__(self) -> str:
     # TODO(danielzheng): Implement a useful str representation.
-    data = dict(
-        subject_with_probes=self.subject_with_probes, code_lines=self.code_lines
-    )
+    data = dict(code_lines=self.code_lines)
     return str(data)
 
 
-# TODO(danielzheng): Add a real action type.
-Action = Any
+################################################################################
+# Bug localization actions
+################################################################################
+
+
+class Action(abc.ABC):
+  """Bug localization action."""
+
+  @abc.abstractmethod
+  def update(self, state: State) -> State:
+    """Applies `self` to `state` to get a new state."""
+
+
+class Halt(Action):
+  """A no-op halt action that does nothing.
+
+  The `run` function recognizes this action and terminates the RL loop.
+  """
+
+  def update(self, state: State) -> State:
+    return state
+
+
+@dataclasses.dataclass
+class AddProbes(Action):
+  """Add probes to `state`.
+
+  Attributes:
+    probes: Sequence of `(line_number, probe_statement)` probes.
+  """
+
+  probes: Probes
+
+  def update(self, state: State) -> State:
+    """Updates state with new probes."""
+    print_color("Adding probes:")
+    for probe in self.probes:
+      print(f"  {probe.line_number}: {probe.statement}")
+
+    # TODO(danielzheng): Optimize this.
+    new_probes = tuple(
+        sorted(state.probes + self.probes, key=lambda probe: probe.line_number)
+    )
+    new_state = dataclasses.replace(state, probes=new_probes)
+
+    # TODO(danielzheng): Do logging.
+    print_color("New state with probes:")
+    print_horizontal_line()
+    print(prepend_line_numbers(new_state.render_code()))
+    print_horizontal_line()
+    return new_state
+
+
+################################################################################
+# Bug localization agents
+################################################################################
+
+
+Reward = int
+
+
+class Agent(abc.ABC):
+  """Bug localization agent."""
+
+  @abc.abstractmethod
+  def pick_action(self, state: State, reward: Reward) -> Action:
+    """Pick an action given the current state and reward.
+
+    Args:
+      state: Current state.
+      reward: Reward for the last action.
+
+    Returns:
+      An action to apply to `state`.
+    """
+
+
+class Localiser(Agent):
+  """Heuristic bug localization agent using code analysis."""
+
+  def pick_action(self, state: State, reward: Reward) -> Action:
+    """Picks action to apply to state."""
+    del reward
+    probes = self.generate_probes(state)
+    # If no probes are generated, then halt.
+    if not probes:
+      return Halt()
+    return AddProbes(probes)
+
+  def generate_probes(self, state: State) -> Probes:
+    """Generate probes for the given state.
+
+    To create each probe, this function must decide whether to query what.
+
+    Args:
+      state: The current state.
+
+    Returns:
+      Sequence of `(line_number, probe_statement)` probes.
+    """
+    return self._generate_probes_random(state)
+
+  def _generate_probes_random(self, state: State) -> Probes:
+    """Generate probes for the given state.
+
+    Args:
+      state: The current state.
+
+    Returns:
+      Sequence of `(line_number, probe_statement)` probes.
+    """
+
+    tree = ast.parse(state.code)
+    # Get all valid insertion line numbers.
+    all_insertion_line_numbers = ast_utils.get_insertion_points(tree)
+    # Remove line numbers that already have probes.
+    valid_insertion_line_numbers = all_insertion_line_numbers - set(
+        probe.line_number for probe in state.probes
+    )
+    if not valid_insertion_line_numbers:
+      return ()
+    # Sample a single new probe.
+    samples = sampling_utils.sample_zipfian(
+        num_samples=1, zipf_param=len(all_insertion_line_numbers)
+    )
+    line_numbers = sampling_utils.sample_wo_replacement_uniform(
+        samples[0], tuple(valid_insertion_line_numbers)
+    )
+    line_numbers.sort()
+
+    probe_variables = state.get_illegal_state_expression_identifiers()
+    probe_statement = instrumentation_utils.make_probe_call(probe_variables)
+    probes = tuple((Probe(offset, probe_statement)) for offset in line_numbers)
+    return probes
+
+  # TODO(etbarr): Build AST, reverse its edges and walk the tree from focal
+  # expression to control expressions and defs
+  # Ignore aliases for now.
+  def _generate_probes_via_flow_analysis(self, state: State) -> Probes:
+    """Use analysis techniques to generate probes for the given state."""
+    del state
+    raise NotImplementedError()
+
+
+################################################################################
+# Bug localization environment
+################################################################################
 
 
 class Environment:
@@ -199,17 +358,16 @@ class Environment:
         )
       # pylint: enable=consider-using-with
       with open(self.subject, "r", encoding="utf8") as f:
-        data = f.read()
-      self.subject_with_probes.write(data)
-      self.subject_with_probes.flush()
-      self.subject_with_probes.seek(0)
+        subject_code = f.read()
     except IOError as e:
       logging.error("Error: Unable to open file '%s'.", self.subject)
       raise IOError(
           "Unable to make a temporary copy of the subject program "
           f"{self.subject} to be instrumented with probes."
       ) from e
-    self.state = State(self.subject_with_probes, bug_lineno)
+    self.state = State(code=subject_code, bug_lineno=bug_lineno)
+    print("Initial state:")
+    print(self.state)
     subject_output = self.execute_subject()
     self.subject_output.add(subject_output)
 
@@ -217,12 +375,10 @@ class Environment:
     """Executes an instrumented version of the subject program.
 
     Returns:
-      The subject's output, concatenating stdout and stderr.
+      The output of the instrumented subject program, concatenating stdout and
+      stderr.
     """
-    assert self.subject_with_probes is not None
-    self.subject_with_probes.seek(0)
-
-    python_source = self.subject_with_probes.read()
+    python_source = self.state.render_code()
     output = instrumentation_utils.run_with_instrumentation(
         python_source=python_source,
         argv=self.subject_argv,
@@ -235,28 +391,13 @@ class Environment:
     print_horizontal_line()
     return output
 
-  def reward(self) -> int:
-    """Returns reward for current state."""
-    return 1
-
-  def terminate(self) -> bool:
-    """Returns True if environment execution should be terminated."""
-
-    if self.steps >= self.max_steps:
-      return True
-    return False
-
-  def update(self, action: Action) -> None:
-    """Apply an action.
+  def step(self, action: Action) -> None:
+    """Perform one step by applying an action.
 
     Args:
       action: Action to apply to the environment.
     """
-    match action:
-      case "Placeholder":
-        pass
-      case _:
-        pass
+    self.state = action.update(self.state)
     self.steps += 1
 
     stdouterr = self.execute_subject()
@@ -272,119 +413,16 @@ class Environment:
         raise AssertionError(error_message)
 
     self.subject_output.add(stdouterr)
-    # TODO(etbarr) Create and return a new state instance
-    # Probe's write their output to a fresh file
 
+  def reward(self) -> Reward:
+    """Returns reward for current state."""
+    return 1
 
-################################################################################
-# Bug localization agents
-################################################################################
-
-
-class Agent(abc.ABC):
-  """RL agent base class for bug localization."""
-
-  def __init__(self, env: Environment):
-    self.env = env
-
-  @abc.abstractmethod
-  def pick_action(self, state: State, reward: int) -> Action:
-    """Pick an action given the current state and reward.
-
-    Args:
-      state: Current state.
-      reward: Reward for the last action.
-
-    Returns:
-      An action to apply to `state`.
-    """
-
-  def add_probes(self, state: State, probes: Sequence[Probe]) -> None:
-    """Add probes to `state`.
-
-    Args:
-      state: Current state.
-      probes: Sequence of `(line_number, probe_statement)` probes.
-    """
-    print_color("Adding probes:")
-    for probe in probes:
-      print(f"  {probe.line_number}: {probe.statement}")
-    # TODO(danielzheng): Rewrite probe insertion using AST to avoid manual
-    # indentation management.
-    for probe in reversed(probes):
-      offset = probe.line_number
-      preceding_line = state.code_lines[offset]
-      indentation = " " * leading_whitespace_count(preceding_line)
-      probe_statement = indentation + probe.statement
-      state.code_lines.insert(offset, probe_statement)
-    state.subject_with_probes.seek(0)
-    state.subject_with_probes.writelines(state.code_lines)
-
-    # TODO(danielzheng): Do logging.
-    print_color("New state with probes:")
-    print_horizontal_line()
-    state.subject_with_probes.seek(0)
-    code = state.subject_with_probes.read()
-    print(prepend_line_numbers(code))
-    print_horizontal_line()
-
-
-class Localiser(Agent):
-  """Heuristic bug localization agent using code analysis."""
-
-  def pick_action(self, state: State, reward: int) -> Action:
-    """Picks action to apply to state."""
-    del reward
-    self.add_probes(state, self.generate_probes(state))
-
-  def generate_probes(self, state: State) -> Sequence[Probe]:
-    """Generate probes for the given state.
-
-    To create each probe, this function must decide whether to query what.
-
-    Args:
-      state: The current state.
-
-    Returns:
-      Sequence of `(line_number, probe_statement)` probes.
-    """
-    return self._generate_probes_random(state)
-
-  def _generate_probes_random(self, state: State) -> Sequence[Probe]:
-    """Generate probes for the given state.
-
-    Args:
-      state: The current state.
-
-    Returns:
-      Sequence of `(line_number, probe_statement)` probes.
-    """
-
-    # TODO(danielzheng): Rewrite as methods on an AST wrapper
-    state.subject_with_probes.seek(0)
-    tree = ast.parse(state.subject_with_probes.read())
-    all_insertion_line_numbers = ast_utils.get_insertion_points(tree)
-    samples = sampling_utils.sample_zipfian(1, len(all_insertion_line_numbers))
-    line_numbers = sampling_utils.sample_wo_replacement_uniform(
-        samples[0], all_insertion_line_numbers
-    )
-    line_numbers.sort()
-
-    # TODO(danielzheng): Use proper AST injection instead of string manipulation
-    # and writing directly to files, to avoid malformed ASTs.
-    probe_variables = state.get_illegal_state_expression_identifiers()
-    probe_statement = instrumentation_utils.make_probe_call(probe_variables)
-    probes = [(Probe(offset, probe_statement)) for offset in line_numbers]
-    state.probes = probes
-    return probes
-
-  # TODO(etbarr): Build AST, reverse its edges and walk the tree from focal
-  # expression to control expressions and defs
-  # Ignore aliases for now.
-  def _generate_probes_via_flow_analysis(self, state: State) -> Sequence[Probe]:
-    """Use analysis techniques to generate probes for the given state."""
-    del state
-    raise NotImplementedError()
+  def terminate(self) -> bool:
+    """Returns True if environment execution should be terminated."""
+    if self.steps >= self.max_steps:
+      return True
+    return False
 
 
 ################################################################################
@@ -407,8 +445,12 @@ def run(
       burnin_steps=burnin_steps,
       max_steps=max_steps,
   )
-  localiser = Localiser(env)
+  agent = Localiser()
   while not env.terminate():
     print_color(f"Step {env.steps}:", color="blue")
-    env.update(localiser.pick_action(env.state, env.reward()))
+    action = agent.pick_action(env.state, env.reward())
+    if isinstance(action, Halt):
+      print_color("Stopping due to halt action.", color="blue")
+      break
+    env.step(action)
   print_color(f"Done: {env.steps} steps performed.", color="blue")
