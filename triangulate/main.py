@@ -120,7 +120,7 @@ def main(argv):
         contextlib.redirect_stderr(buffer),
     ):
       runpy.run_path(subject, run_name="__main__")
-  except:  # pylint: disable=bare-except
+  except Exception:  # pylint: disable=broad-except
     exc_info = sys.exc_info()
   finally:
     print_panel(buffer.getvalue().removesuffix("\n"), title="Subject output")
