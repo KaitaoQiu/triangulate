@@ -17,6 +17,7 @@
 from collections.abc import Sequence
 import os
 import re
+from typing import Type
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -111,7 +112,7 @@ class LocaliserTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
-          testcase_name='test_a',
+          testcase_name='quoter',
           subject='quoter.py',
       ),
   )
@@ -133,6 +134,43 @@ class LocaliserTest(parameterized.TestCase):
     )
     localiser = core.Localiser()
     localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
+
+
+class MainTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='quoter_no_exception_raised',
+          subject='quoter.py',
+          subject_argv=['quoter.py', '--index', '0'],
+          expected_result=core.NoExceptionRaised,
+      ),
+      dict(
+          testcase_name='quoter_exception_raised',
+          subject='quoter.py',
+          subject_argv=['quoter.py', '--index', '1'],
+          expected_result=core.Result,
+      ),
+  )
+  def test_run(
+      self,
+      subject: str,
+      expected_result: Type[core.ResultOrError] | core.ResultOrError,
+      subject_argv: Sequence[str] = (),
+      burnin_steps: int = 10,
+      max_steps: int = 100,
+  ):
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
+    result = core.run(
+        subject=subject,
+        subject_argv=subject_argv,
+        burnin_steps=burnin_steps,
+        max_steps=max_steps,
+    )
+    if isinstance(expected_result, type):
+      self.assertEqual(type(result), expected_result)
+    else:
+      self.assertEqual(result, expected_result)
 
 
 if __name__ == '__main__':

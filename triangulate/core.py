@@ -17,9 +17,16 @@
 import abc
 import ast
 from collections.abc import Sequence
+import contextlib
 import dataclasses
+import io
 import math
+import runpy
+import sys
 import tempfile
+import traceback
+import types
+from typing import TypeAlias
 
 from absl import logging
 from rich.syntax import Syntax
@@ -40,8 +47,20 @@ print_panel = logging_utils.print_panel
 ################################################################################
 
 
+class BugLocalizationException(Exception):
+  """A bug localization exception."""
+
+
 @dataclasses.dataclass
-class LineNumberOutOfBounds(Exception):
+class NoExceptionRaised(BugLocalizationException):
+  """Subject program does not raise an exception."""
+
+  subject: str
+  subject_argv: Sequence[str]
+
+
+@dataclasses.dataclass
+class LineNumberOutOfBounds(BugLocalizationException):
   """Line number is out of bounds for program."""
 
   code: str
@@ -55,7 +74,7 @@ class LineNumberOutOfBounds(Exception):
 
 
 @dataclasses.dataclass
-class CouldNotResolveIllegalStateExpressionError(Exception):
+class CouldNotResolveIllegalStateExpressionError(BugLocalizationException):
   """Illegal state expression could not be resolved for code and line number."""
 
   code: str
@@ -339,7 +358,8 @@ class Environment:
   Attributes:
     state: The environment state.
     subject: The subject program filepath.
-    subject_argv: Subject program arguments.
+    subject_argv: Subject program arguments, as represented like `sys.argv` when
+      executing a Python program. `subject_argv[0]` should be the program name.
     subject_output: Set of outputs (stdout and stderr) from running the
       instrumented subject program.
     steps: The number of steps executed so far.
@@ -446,18 +466,50 @@ class Environment:
 
 
 ################################################################################
-# Entry point
+# Entry points
 ################################################################################
 
 
-def run(
+@dataclasses.dataclass
+class Result:
+  """A bug localization result.
+
+  TODO(danielzheng): Add attributes to `State` to make this more informative.
+  It should be easy to access the final "predicted bug location" as a property.
+
+  Attributes:
+    final_state: The final bug localization state.
+    localization_steps: The number of localization steps performed.
+  """
+
+  final_state: State
+  localization_steps: int
+
+
+# Bug localization result: either a concrete result or an exception.
+ResultOrError: TypeAlias = Result | BugLocalizationException
+
+
+def run_with_bug_lineno(
     subject: str,
     subject_argv: Sequence[str],
     bug_lineno: int,
     burnin_steps: int | None = None,
     max_steps: int | None = None,
-):
-  """Runs bug localization."""
+) -> Result:
+  """Runs bug localization with a given bug location.
+
+  Args:
+    subject: The subject program filepath.
+    subject_argv: Subject program arguments, as represented like `sys.argv` when
+      executing a Python program. `subject_argv[0]` should be the program name.
+    bug_lineno: The line number of the bug in `subject`.
+    burnin_steps: The maximum number of warmup steps to execute.
+    max_steps: The maximum number of steps before termination.
+
+  Returns:
+    Bug localization result, containing the final predicted bug location.
+  """
   env = Environment(
       subject=subject,
       subject_argv=subject_argv,
@@ -474,3 +526,117 @@ def run(
       break
     env.step(action)
   CONSOLE.print(f"Done: {env.steps} steps performed.", style="bold blue")
+  return Result(env.state, env.steps)
+
+
+# The result type of `sys.exc_info()`.
+ExcInfo: TypeAlias = tuple[
+    type[BaseException], BaseException, types.TracebackType
+]
+
+
+def run_from_exception(
+    subject: str,
+    subject_argv: Sequence[str],
+    exc_info: ExcInfo,
+    burnin_steps: int | None,
+    max_steps: int | None,
+) -> ResultOrError:
+  """Runs bug localization for the given exception info.
+
+  Uses `exc_info` to determine the illegal state expression.
+
+  Args:
+    subject: The subject program filepath.
+    subject_argv: Subject program arguments, as represented like `sys.argv` when
+      executing a Python program. `subject_argv[0]` should be the program name.
+    exc_info: Exception information as returned by `sys.exc_info()`, including
+      the exception information and traceback.
+    burnin_steps: The maximum number of warmup steps to execute.
+    max_steps: The maximum number of steps before termination.
+
+  Returns:
+    Bug localization result: `CouldNotResolveIllegalStateExpressionError` if the
+    illegal state expression could not be resolved from the exception, or the
+    result of `run_with_bug_lineno` otherwise.
+  """
+  CONSOLE.print("Exception caught:", style="bold yellow")
+  _, exc_value, tb = exc_info
+  if exc_value is None:
+    raise NoExceptionRaised(subject=subject, subject_argv=subject_argv)
+  traceback.print_tb(tb)
+  tb_info = traceback.extract_tb(tb)
+  exc_last_frame = tb_info[-1]
+  exc_lineno = exc_last_frame.lineno
+
+  try:
+    return run_with_bug_lineno(
+        subject=subject,
+        subject_argv=subject_argv,
+        bug_lineno=exc_lineno,
+        burnin_steps=burnin_steps,
+        max_steps=max_steps,
+    )
+  except CouldNotResolveIllegalStateExpressionError as e:
+    CONSOLE.print(
+        "Could not resolve illegal state expression from exception:",
+        style="bold red",
+    )
+    traceback.print_exception(exc_value, limit=-1)
+    return e
+
+
+def run(
+    subject: str,
+    subject_argv: Sequence[str],
+    burnin_steps: int | None,
+    max_steps: int | None,
+) -> ResultOrError:
+  """Runs bug localization for the given subject program and arguments.
+
+  Executes the subject program with arguments. If an exception is thrown, the
+  exception location is used as the bug location.
+
+  Args:
+    subject: The subject program filepath.
+    subject_argv: Subject program arguments, as represented like `sys.argv` when
+      executing a Python program. `subject_argv[0]` should be the program name.
+    burnin_steps: The maximum number of warmup steps to execute.
+    max_steps: The maximum number of steps before termination.
+
+  Returns:
+    Bug localization result: `NoExceptionRaised` if no exception was thrown by
+    the subject program, or the result of `run_from_exception` otherwise.
+  """
+  # Rewrite `sys.argv` to subject program's argv.
+  sys.argv = subject_argv
+
+  buffer = io.StringIO()
+  exc_info = None
+  try:
+    CONSOLE.print(rf"[blue][b]Running:[/b][/blue] {subject}")
+    with (
+        contextlib.redirect_stdout(buffer),
+        contextlib.redirect_stderr(buffer),
+    ):
+      runpy.run_path(subject, run_name="__main__")
+  except Exception:  # pylint: disable=broad-except
+    exc_info = sys.exc_info()
+  finally:
+    print_panel(buffer.getvalue().removesuffix("\n"), title="Subject output")
+
+  if exc_info is not None:
+    return run_from_exception(
+        subject=subject,
+        subject_argv=subject_argv,
+        exc_info=exc_info,
+        burnin_steps=burnin_steps,
+        max_steps=max_steps,
+    )
+
+  CONSOLE.print(rf"[green][b]Success:[/b][/green] {subject}")
+  CONSOLE.print(
+      "Triangulate did not run because no exception was thrown.",
+      style="bold green",
+  )
+  return NoExceptionRaised(subject=subject, subject_argv=subject_argv)
