@@ -20,7 +20,12 @@ from collections.abc import Iterable, Sequence, Set
 import dataclasses
 from typing import cast, Callable, Generic, TypeVar
 
+from python_graphs import program_graph
+from python_graphs import program_graph_dataclasses as pb
 from triangulate import instrumentation_utils
+
+ProgramGraph = program_graph.ProgramGraph
+ProgramGraphNode = program_graph.ProgramGraphNode
 
 NodeSelector = Callable[[ast.AST], bool]
 
@@ -118,6 +123,8 @@ class IsProbeStatement(StaticNodePredicate):
     return True
 
 
+# TODO(danielzheng): Eventually, delete AST and use ProgramGraph instead.
+# Upstream utilities (e.g. node selection APIs) to python_graphs if needed.
 class AST:
   """ast.AST wrapper with methods for querying nodes by selector."""
 
@@ -245,3 +252,13 @@ def get_insertion_points(tree: ast.AST) -> Set[int]:
   if not insertion_points:
     raise ValueError("No valid insertion points found.")
   return insertion_points
+
+
+def get_ast_descendents_of_type(
+    program_graph: ProgramGraph,
+    node: ProgramGraphNode,
+    ast_type: str,
+) -> Iterable[ProgramGraphNode]:
+  for node in program_graph.walk_ast_descendants(node):
+    if node.node_type == pb.NodeType.AST_NODE and node.ast_type == ast_type:
+      yield node

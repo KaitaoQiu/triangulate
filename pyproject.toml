@@ -18,8 +18,9 @@ keywords = []
 dependencies = [
     "absl-py",
     "numpy",
+    "ordered-set",
     "rich",
-    "python-magic",
+    "python-graphs",
 ]
 
 # `version` is automatically set by flit to use `triangulate.__version__`
