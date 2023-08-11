@@ -25,18 +25,21 @@ from triangulate import logging_utils
 
 ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
 
-Localiser = core.Localiser
-Environment = core.Environment
-
 CONSOLE = logging_utils.CONSOLE
 print_panel = logging_utils.print_panel
 
+_AGENT = flags.DEFINE_enum_class(
+    "agent",
+    core.AgentEnum.RANDOM_PROBING,
+    core.AgentEnum,
+    help="The bug localization RL agent to use.",
+)
 # During burnin, the program stores outputs for later use to checking
 # whether injecting/executing probes has changed program semantics.
 _BURNIN_STEPS = flags.DEFINE_integer(
     "burnin_steps",
     None,
-    short_name="n",
+    short_name="bs",
     help=(
         "Percentage of max_steps to use as burnin steps to tolerate "
         "nondeterministic buggy programs; zero (the default) disables burnin."
@@ -45,7 +48,7 @@ _BURNIN_STEPS = flags.DEFINE_integer(
 _MAX_STEPS = flags.DEFINE_integer(
     "max_steps",
     None,
-    short_name="m",
+    short_name="ms",
     help="maximum simulation steps",
 )
 
@@ -57,6 +60,7 @@ def main(argv):
     )
 
   # Save flag values.
+  agent = _AGENT.value.make_agent()
   burnin_steps = _BURNIN_STEPS.value
   max_steps = _MAX_STEPS.value
 
@@ -77,6 +81,7 @@ def main(argv):
   core.run(
       subject,
       subject_argv,
+      agent=agent,
       burnin_steps=burnin_steps,
       max_steps=max_steps,
   )

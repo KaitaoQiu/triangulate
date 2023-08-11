@@ -100,7 +100,7 @@ Today's inspirational quote:
   ):
     """Known unsupported cases for illegal state expression resolution."""
     subject = os.path.join(TESTDATA_DIRECTORY, subject)
-    with self.assertRaises(core.CouldNotResolveIllegalStateExpressionError):
+    with self.assertRaises(core.CouldNotIdentifyIllegalStateExpressionError):
       _ = core.Environment(
           subject=subject,
           subject_argv=(subject,) + tuple(subject_argv),
@@ -108,7 +108,7 @@ Today's inspirational quote:
       )
 
 
-class LocaliserTest(parameterized.TestCase):
+class RandomProbingTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
@@ -132,8 +132,88 @@ class LocaliserTest(parameterized.TestCase):
         burnin_steps=burnin_steps,
         max_steps=max_steps,
     )
-    localiser = core.Localiser()
-    localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
+    random_probing = core.RandomProbing()
+    random_probing.generate_probes(env.state)
+
+
+FUNCTION_CALL_ARGV = ['function_call.py', '0', '1', '2', '3']
+
+
+class AgentInspectVariableActionTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='function_call_bfs',
+          subject='function_call.py',
+          subject_argv=FUNCTION_CALL_ARGV,
+          agent=core.AgentEnum.BFS,
+          expected_inspected_variable_names=(
+              'd',
+              'distance',
+              'x1',
+              'x2',
+              'y1',
+              'y2',
+              'math',
+              'x_diff_squared',
+              'y_diff_squared',
+              'x_diff',
+              'x_diff',
+              'y_diff',
+              'y_diff',
+              'x1',
+              'x2',
+              'y1',
+              'y2',
+          ),
+      ),
+      dict(
+          testcase_name='function_call_dfs',
+          subject='function_call.py',
+          subject_argv=FUNCTION_CALL_ARGV,
+          agent=core.AgentEnum.DFS,
+          expected_inspected_variable_names=(
+              'd',
+              'y2',
+              'y1',
+              'x2',
+              'x1',
+              'distance',
+              'y_diff_squared',
+              'y_diff',
+              'y2',
+              'y1',
+              'y_diff',
+              'x_diff_squared',
+              'x_diff',
+              'x2',
+              'x1',
+              'x_diff',
+              'math',
+          ),
+      ),
+  )
+  def test_inspected_variables(
+      self,
+      subject: str,
+      subject_argv: Sequence[str],
+      agent: core.AgentEnum,
+      expected_inspected_variable_names: Sequence[str],
+  ):
+    subject = os.path.join(TESTDATA_DIRECTORY, subject)
+    result = core.run(
+        subject=subject,
+        subject_argv=subject_argv,
+        agent=agent.make_agent(),
+    )
+    self.assertIsInstance(result, core.Result)
+    assert isinstance(result, core.Result)  # For pytype.
+    inspected_variables = result.final_state.inspected_variables
+    inspected_variable_names = tuple(n.node.id for n in inspected_variables)
+    self.assertSequenceEqual(
+        inspected_variable_names,
+        expected_inspected_variable_names,
+    )
 
 
 class MainTest(parameterized.TestCase):
@@ -164,6 +244,7 @@ class MainTest(parameterized.TestCase):
     result = core.run(
         subject=subject,
         subject_argv=subject_argv,
+        agent=core.RandomProbing(),
         burnin_steps=burnin_steps,
         max_steps=max_steps,
     )

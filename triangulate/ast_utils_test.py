@@ -15,7 +15,7 @@
 """Tests for ast_utils."""
 
 import ast
-from collections.abc import Sequence
+from collections.abc import Sequence, Set
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -31,7 +31,7 @@ def add_one(x):
 """.strip()
 
 
-class ASTTest(absltest.TestCase):
+class ASTTest(parameterized.TestCase):
 
   def test_get_insertion_points(self):
     tree = ast.parse(EXAMPLE_PROGRAM)
@@ -39,11 +39,18 @@ class ASTTest(absltest.TestCase):
     # Every line except the debugging probe call is an insertion point.
     self.assertSetEqual(insertion_line_numbers, {0, 2, 3})
 
-  def test_extract_identifiers(self):
-    test_expr = "x + y * foo(z,c)"
-    test_expr_fv = set(["c", "x", "y", "z"])
-    fv = ast_utils.extract_identifiers(test_expr)
-    self.assertEqual(test_expr_fv, set(fv))
+  @parameterized.named_parameters(
+      dict(
+          testcase_name="simple",
+          source="x + y * foo(z, w)",
+          expected_variables={"x", "y", "foo", "z", "w"},
+      ),
+  )
+  def test_identifier_extraction(
+      self, source: str, expected_variables: Set[str]
+  ):
+    variables = set(ast_utils.AST(source).select_identifiers())
+    self.assertSetEqual(variables, expected_variables)
 
 
 class ASTNodeSelection(parameterized.TestCase):

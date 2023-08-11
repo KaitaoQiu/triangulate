@@ -12,23 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Printing and logging utilities."""
+#!/usr/bin/env bash
 
-from typing import Any
+# Exit when any command fails.
+set -e
 
-from rich.console import Console
-from rich.panel import Panel
-
-
-CONSOLE = Console()
-
-STEP_STYLE = "bold blue"
-ACTION_STYLE = "bold purple4"
-
-
-def print_panel(renderable: Any, title: str = ""):
-  CONSOLE.print(Panel(renderable, title=title))
-
-
-def print_horizontal_line(title: str = ""):
-  CONSOLE.rule(title=title)
+sudo apt install libgraphviz-dev
