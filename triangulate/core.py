@@ -826,8 +826,8 @@ def run_from_exception(
     subject_argv: Sequence[str],
     agent: Agent,
     exc_info: ExcInfo,
-    burnin_steps: int | None,
-    max_steps: int | None,
+    burnin_steps: int | None = None,
+    max_steps: int | None = None,
 ) -> ResultOrError:
   """Runs bug localization for the given exception info.
 
@@ -879,8 +879,8 @@ def run(
     subject: str,
     subject_argv: Sequence[str],
     agent: Agent,
-    burnin_steps: int | None,
-    max_steps: int | None,
+    burnin_steps: int | None = None,
+    max_steps: int | None = None,
 ) -> ResultOrError:
   """Runs bug localization for the given subject program and arguments.
 
