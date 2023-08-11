@@ -100,7 +100,7 @@ Today's inspirational quote:
   ):
     """Known unsupported cases for illegal state expression resolution."""
     subject = os.path.join(TESTDATA_DIRECTORY, subject)
-    with self.assertRaises(core.CouldNotResolveIllegalStateExpressionError):
+    with self.assertRaises(core.CouldNotIdentifyIllegalStateExpressionError):
       _ = core.Environment(
           subject=subject,
           subject_argv=(subject,) + tuple(subject_argv),

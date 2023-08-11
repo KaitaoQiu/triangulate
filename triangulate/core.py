@@ -84,8 +84,8 @@ class LineNumberOutOfBounds(BugLocalizationException):
 
 
 @dataclasses.dataclass
-class CouldNotResolveIllegalStateExpressionError(BugLocalizationException):
-  """Illegal state expression could not be resolved for code and line number."""
+class CouldNotIdentifyIllegalStateExpressionError(BugLocalizationException):
+  """Could not identify illegal state expression from code and line number."""
 
   code: str
   lineno: int
@@ -160,9 +160,9 @@ class State:
   # TODO(danielzheng): Generalize to properties, e.g. `sys.argv`.
   # - Generalization of "variables" - this represents a `probe` statement like
   #   `print` in a debugger, along the execution path towards the exception.
-  # inspected_variables: Set[str] = frozenset()
-  # candidate_variables_to_inspect: Set[str] | None = None
-  inspected_variables: OrderedSet[ProgramGraphNode] = OrderedSet()
+  inspected_variables: OrderedSet[ProgramGraphNode] = dataclasses.field(
+      default_factory=OrderedSet
+  )
   candidate_variables_to_inspect: OrderedSet[ProgramGraphNode] | None = None
   probes: Probes = ()
 
@@ -186,7 +186,7 @@ class State:
           self.code, self.bug_lineno
       )
       if illegal_state_expression is None:
-        raise CouldNotResolveIllegalStateExpressionError(
+        raise CouldNotIdentifyIllegalStateExpressionError(
             self.code, self.bug_lineno
         )
 
@@ -842,9 +842,9 @@ def run_from_exception(
     max_steps: The maximum number of steps before termination.
 
   Returns:
-    Bug localization result: `CouldNotResolveIllegalStateExpressionError` if the
-    illegal state expression could not be resolved from the exception, or the
-    result of `run_with_bug_lineno` otherwise.
+    Bug localization result: `CouldNotIdentifyIllegalStateExpressionError` if
+    the illegal state expression could not be identified from the exception, or
+    the result of `run_with_bug_lineno` otherwise.
   """
   rprint("Exception caught:", style="bold yellow")
   _, exc_value, tb = exc_info
@@ -864,9 +864,9 @@ def run_from_exception(
         burnin_steps=burnin_steps,
         max_steps=max_steps,
     )
-  except CouldNotResolveIllegalStateExpressionError as e:
+  except CouldNotIdentifyIllegalStateExpressionError as e:
     rprint(
-        "Could not resolve illegal state expression from exception:",
+        "Could not identify illegal state expression from exception:",
         style="bold red",
     )
     traceback.print_exception(exc_value, limit=-1)
