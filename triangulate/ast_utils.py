@@ -18,7 +18,7 @@ import abc
 import ast
 from collections.abc import Iterable, Sequence, Set
 import dataclasses
-from typing import cast, Callable, Type
+from typing import cast, Callable, Generic, TypeVar
 
 from triangulate import instrumentation_utils
 
@@ -28,8 +28,9 @@ NodeSelector = Callable[[ast.AST], bool]
 class NodePredicate(abc.ABC):
   """An AST node predicate."""
 
+  @abc.abstractmethod
   def __call__(self, node: ast.AST) -> bool:
-    raise NotImplementedError()
+    """Returns True if `node` matches the predicate."""
 
   def __and__(self, other: "NodePredicate") -> "NodePredicate":
     return All((self, other))
@@ -67,11 +68,14 @@ class All(NodePredicate):
     return all(predicate(node) for predicate in self.predicates)
 
 
+ASTNodeType = TypeVar("ASTNodeType", bound=ast.AST)
+
+
 @dataclasses.dataclass
-class HasType(NodePredicate):
+class HasType(NodePredicate, Generic[ASTNodeType]):
   """Returns True for nodes with a given type."""
 
-  type: Type[ast.AST]
+  type: type[ASTNodeType]
 
   def __call__(self, node: ast.AST) -> bool:
     return isinstance(node, self.type)
@@ -117,6 +121,10 @@ class IsProbeStatement(StaticNodePredicate):
 class AST:
   """ast.AST wrapper with methods for querying nodes by selector."""
 
+  source: str
+  root: ast.AST
+  nodes: Sequence[ast.AST]
+
   def __init__(self, source: str):
     self.source = source
     self.root = ast.parse(source)
@@ -125,7 +133,21 @@ class AST:
       self.nodes.append(node)
 
   def select_nodes(self, selector: NodeSelector) -> Iterable[ast.AST]:
+    """Returns descendent nodes that match a selector."""
     return (node for node in self.nodes if selector(node))
+
+  def select_nodes_by_type(
+      self, node_type: type[ASTNodeType]
+  ) -> Iterable[ASTNodeType]:
+    """Returns descendent nodes that have the given type."""
+    selector = HasType(node_type)
+    return (node for node in self.nodes if selector(node))
+
+  def select_names(self) -> Iterable[ast.Name]:
+    return self.select_nodes_by_type(ast.Name)
+
+  def select_identifiers(self) -> Iterable[str]:
+    return (name.id for name in self.select_nodes_by_type(ast.Name))
 
 
 def extract_assert_statements(
@@ -223,27 +245,3 @@ def get_insertion_points(tree: ast.AST) -> Set[int]:
   if not insertion_points:
     raise ValueError("No valid insertion points found.")
   return insertion_points
-
-
-class IdentifierExtractor(ast.NodeVisitor):
-  """Visitor that extracts variable identifiers from an AST."""
-
-  def __init__(self):
-    self.identifiers = set()
-
-  # This Google-violating function naming is required
-  # to confirm with Python's builtin AST library's interface.
-  def visit_Name(self, node: ast.Name) -> None:  # pylint: disable=invalid-name
-    self.identifiers.add(node.id)
-
-  def visit_Call(self, node: ast.Call) -> None:  # pylint: disable=invalid-name
-    for arg in node.args:
-      self.visit(arg)
-
-
-def extract_identifiers(expr: str) -> Sequence[str]:
-  """Parse a Python expression and extract its identifiers."""
-  root = ast.parse(expr)
-  visitor = IdentifierExtractor()
-  visitor.visit(root)
-  return sorted(visitor.identifiers)

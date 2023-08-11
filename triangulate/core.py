@@ -176,7 +176,9 @@ class State:
 
   def get_illegal_state_expression_identifiers(self) -> Sequence[str]:
     """Return identifiers in the illegal state expression."""
-    return ast_utils.extract_identifiers(self.illegal_state_expression)
+    return tuple(
+        ast_utils.AST(self.illegal_state_expression).select_identifiers()
+    )
 
   def render_code(self) -> str:
     """Renders the code with probes inserted."""
