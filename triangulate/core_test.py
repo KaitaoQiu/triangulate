@@ -108,7 +108,7 @@ Today's inspirational quote:
       )
 
 
-class LocaliserTest(parameterized.TestCase):
+class RandomProbingTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
@@ -132,8 +132,8 @@ class LocaliserTest(parameterized.TestCase):
         burnin_steps=burnin_steps,
         max_steps=max_steps,
     )
-    localiser = core.Localiser()
-    localiser._generate_probes_random(env.state)  # pylint: disable=protected-access
+    random_probing = core.RandomProbing()
+    random_probing.generate_probes(env.state)
 
 
 class MainTest(parameterized.TestCase):

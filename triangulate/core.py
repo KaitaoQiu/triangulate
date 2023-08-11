@@ -282,8 +282,26 @@ class Agent(abc.ABC):
     """
 
 
-class Localiser(Agent):
-  """Heuristic bug localization agent using code analysis."""
+@dataclasses.dataclass
+class Replayer(Agent):
+  """Agent that executes a predefined sequence of actions."""
+
+  actions: Sequence[Action]
+  action_index: int = 0
+
+  def pick_action(self, state: State, reward: Reward) -> Action:
+    del state, reward  # Unused.
+    if self.action_index == len(self.actions):
+      return Halt()
+    action = self.actions[self.action_index]
+    self.action_index += 1
+    return action
+
+
+# TODO(danielzheng): Figure out how to make probes useful within agents.
+# May need to update illegal state expression representation with probe info.
+class ProbingAgent(Agent, abc.ABC):
+  """Agent that inserts probes at random locations."""
 
   def pick_action(self, state: State, reward: Reward) -> Action:
     """Picks action to apply to state."""
@@ -294,22 +312,10 @@ class Localiser(Agent):
       return Halt()
     return AddProbes(probes)
 
+  @abc.abstractmethod
   def generate_probes(self, state: State) -> Probes:
     """Generate probes for the given state.
 
-    To create each probe, this function must decide whether to query what.
-
-    Args:
-      state: The current state.
-
-    Returns:
-      Sequence of `(line_number, probe_statement)` probes.
-    """
-    return self._generate_probes_random(state)
-
-  def _generate_probes_random(self, state: State) -> Probes:
-    """Generate probes for the given state.
-
     Args:
       state: The current state.
 
@@ -317,6 +323,12 @@ class Localiser(Agent):
       Sequence of `(line_number, probe_statement)` probes.
     """
 
+
+class RandomProbing(ProbingAgent):
+  """Agent that inserts probes at random locations."""
+
+  def generate_probes(self, state: State) -> Probes:
+    """Generate probes for the given state at a random valid location."""
     tree = ast.parse(state.code)
     # Get all valid insertion line numbers.
     all_insertion_line_numbers = ast_utils.get_insertion_points(tree)
