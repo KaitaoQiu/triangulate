@@ -15,6 +15,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    # Install system deps
+    - name: Install deps
+      shell: bash
+      run: ./.github/scripts/install.sh
+
     # Install deps
     - uses: actions/setup-python@v4
       with:
