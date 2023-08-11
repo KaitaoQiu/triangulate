@@ -95,9 +95,7 @@ class CouldNotResolveIllegalStateExpressionError(BugLocalizationException):
 class VariableAlreadyInspected(BugLocalizationException):
   """Cannot inspect variable that has already been inspected."""
 
-  variable: str
-  # inspected_variables: Set[str]
-  # candidate_variables_to_inspect: Set[str]
+  variable: ProgramGraphNode
   inspected_variables: OrderedSet[ProgramGraphNode]
   candidate_variables_to_inspect: OrderedSet[ProgramGraphNode]
 
@@ -106,9 +104,7 @@ class VariableAlreadyInspected(BugLocalizationException):
 class VariableNotInspectionCandidate(BugLocalizationException):
   """Cannot inspect variable that is not a candidate for inspection."""
 
-  variable: str
-  # inspected_variables: Set[str]
-  # candidate_variables_to_inspect: Set[str]
+  variable: ProgramGraphNode
   inspected_variables: OrderedSet[ProgramGraphNode]
   candidate_variables_to_inspect: OrderedSet[ProgramGraphNode]
 
@@ -239,9 +235,9 @@ class State:
       )
 
     new_inspected_variables = self.inspected_variables | {variable}
-    new_candidate_variables_to_inspect = self.candidate_variables_to_inspect - {
-        variable
-    }
+    new_candidate_variables_to_inspect = OrderedSet(
+        self.candidate_variables_to_inspect - {variable}
+    )
 
     # Update candidate variables to inspect.
     parent_node: ProgramGraphNode = self.program_graph.parent(variable)
@@ -271,7 +267,9 @@ class State:
             return_value_identifiers = ast_utils.get_ast_descendents_of_type(
                 self.program_graph, return_value_node, ast.Name
             )
-            new_candidate_variables_to_inspect.update(return_value_identifiers)
+            new_candidate_variables_to_inspect.update(
+                tuple(return_value_identifiers)
+            )
 
     definition_nodes = self.program_graph.outgoing_neighbors(
         variable, edge_type=pb.EdgeType.LAST_WRITE
