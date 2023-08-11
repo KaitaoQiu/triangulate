@@ -73,14 +73,14 @@ class All(NodePredicate):
     return all(predicate(node) for predicate in self.predicates)
 
 
-ASTNodeType = TypeVar("ASTNodeType", bound=ast.AST)
+ASTNodeT = TypeVar("ASTNodeT", bound=ast.AST)
 
 
 @dataclasses.dataclass
-class HasType(NodePredicate, Generic[ASTNodeType]):
+class HasType(NodePredicate, Generic[ASTNodeT]):
   """Returns True for nodes with a given type."""
 
-  type: type[ASTNodeType]
+  type: type[ASTNodeT]
 
   def __call__(self, node: ast.AST) -> bool:
     return isinstance(node, self.type)
@@ -144,8 +144,8 @@ class AST:
     return (node for node in self.nodes if selector(node))
 
   def select_nodes_by_type(
-      self, node_type: type[ASTNodeType]
-  ) -> Iterable[ASTNodeType]:
+      self, node_type: type[ASTNodeT]
+  ) -> Iterable[ASTNodeT]:
     """Returns descendent nodes that have the given type."""
     selector = HasType(node_type)
     return (node for node in self.nodes if selector(node))
@@ -255,10 +255,15 @@ def get_insertion_points(tree: ast.AST) -> Set[int]:
 
 
 def get_ast_descendents_of_type(
-    program_graph: ProgramGraph,
-    node: ProgramGraphNode,
-    ast_type: str,
+    graph: ProgramGraph,
+    root: ProgramGraphNode,
+    ast_type: type[ast.AST],
 ) -> Iterable[ProgramGraphNode]:
-  for node in program_graph.walk_ast_descendants(node):
-    if node.node_type == pb.NodeType.AST_NODE and node.ast_type == ast_type:
+  """Returns all descendant nodes matching `ast_type`."""
+  ast_type_name = ast_type.__name__
+  for node in graph.walk_ast_descendants(root):
+    if (
+        node.node_type == pb.NodeType.AST_NODE
+        and node.ast_type == ast_type_name
+    ):
       yield node

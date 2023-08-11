@@ -217,7 +217,7 @@ class State:
     """Returns all variable identifiers in the illegal state expression."""
     return OrderedSet(
         ast_utils.get_ast_descendents_of_type(
-            self.program_graph, self.illegal_state_expression_node, "Name"
+            self.program_graph, self.illegal_state_expression_node, ast.Name
         )
     )
 
@@ -255,7 +255,7 @@ class State:
         rprint("Function definition node:", style="yellow")
         print(self.program_graph.dump_tree(function_definition_node))
         return_nodes = ast_utils.get_ast_descendents_of_type(
-            self.program_graph, function_definition_node, "Return"
+            self.program_graph, function_definition_node, ast.Return
         )
         for return_node in return_nodes:
           rprint("Return node:", style="yellow")
@@ -269,7 +269,7 @@ class State:
             print(self.program_graph.dump_tree(return_value_node))
             # TODO(danielzheng): Ignore module and attribute name identifiers.
             return_value_identifiers = ast_utils.get_ast_descendents_of_type(
-                self.program_graph, return_value_node, "Name"
+                self.program_graph, return_value_node, ast.Name
             )
             new_candidate_variables_to_inspect.update(return_value_identifiers)
 

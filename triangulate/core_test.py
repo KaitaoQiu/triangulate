@@ -207,6 +207,7 @@ class AgentInspectVariableActionTest(parameterized.TestCase):
         agent=agent.make_agent(),
     )
     self.assertIsInstance(result, core.Result)
+    assert isinstance(result, core.Result)  # For pytype.
     inspected_variables = result.final_state.inspected_variables
     inspected_variable_names = tuple(n.node.id for n in inspected_variables)
     self.assertSequenceEqual(
