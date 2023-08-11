@@ -164,6 +164,7 @@ class MainTest(parameterized.TestCase):
     result = core.run(
         subject=subject,
         subject_argv=subject_argv,
+        agent=core.RandomProbing(),
         burnin_steps=burnin_steps,
         max_steps=max_steps,
     )

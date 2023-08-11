@@ -19,6 +19,7 @@ import ast
 from collections.abc import Sequence
 import contextlib
 import dataclasses
+import enum
 import io
 import math
 import runpy
@@ -361,6 +362,26 @@ class RandomProbing(ProbingAgent):
     raise NotImplementedError()
 
 
+class AgentEnum(enum.Enum):
+  """Enumeration of bug localization agents.
+
+  Enum values are `Agent` factory functions: `Callable[[], Agent]`.
+  """
+
+  RANDOM_PROBING = enum.auto()
+  FLOW_BASED_PROBING = enum.auto()
+
+  def make_agent(self) -> Agent:
+    """Makes an agent."""
+    match self:
+      case self.RANDOM_PROBING:
+        return RandomProbing()
+      case self.FLOW_BASED_PROBING:
+        return FlowBasedProbing()
+      case _:
+        raise ValueError(f"Unknown agent type: {self}")
+
+
 ################################################################################
 # Bug localization environment
 ################################################################################
@@ -504,9 +525,12 @@ class Result:
 ResultOrError: TypeAlias = Result | BugLocalizationException
 
 
+# TODO(danielzheng): Fix this to take `illegal_state_expression` instead of
+# `bug_lineno`. `bug_lineno` is imprecise and insufficient.
 def run_with_bug_lineno(
     subject: str,
     subject_argv: Sequence[str],
+    agent: Agent,
     bug_lineno: int,
     burnin_steps: int | None = None,
     max_steps: int | None = None,
@@ -517,6 +541,7 @@ def run_with_bug_lineno(
     subject: The subject program filepath.
     subject_argv: Subject program arguments, as represented like `sys.argv` when
       executing a Python program. `subject_argv[0]` should be the program name.
+    agent: The agent for bug localization.
     bug_lineno: The line number of the bug in `subject`.
     burnin_steps: The maximum number of warmup steps to execute.
     max_steps: The maximum number of steps before termination.
@@ -531,7 +556,6 @@ def run_with_bug_lineno(
       burnin_steps=burnin_steps,
       max_steps=max_steps,
   )
-  agent = Localiser()
   while not env.terminate():
     CONSOLE.print(f"Step {env.steps}:", style="bold blue")
     action = agent.pick_action(env.state, env.reward())
@@ -552,6 +576,7 @@ ExcInfo: TypeAlias = tuple[
 def run_from_exception(
     subject: str,
     subject_argv: Sequence[str],
+    agent: Agent,
     exc_info: ExcInfo,
     burnin_steps: int | None,
     max_steps: int | None,
@@ -564,6 +589,7 @@ def run_from_exception(
     subject: The subject program filepath.
     subject_argv: Subject program arguments, as represented like `sys.argv` when
       executing a Python program. `subject_argv[0]` should be the program name.
+    agent: The agent for bug localization.
     exc_info: Exception information as returned by `sys.exc_info()`, including
       the exception information and traceback.
     burnin_steps: The maximum number of warmup steps to execute.
@@ -587,6 +613,7 @@ def run_from_exception(
     return run_with_bug_lineno(
         subject=subject,
         subject_argv=subject_argv,
+        agent=agent,
         bug_lineno=exc_lineno,
         burnin_steps=burnin_steps,
         max_steps=max_steps,
@@ -603,6 +630,7 @@ def run_from_exception(
 def run(
     subject: str,
     subject_argv: Sequence[str],
+    agent: Agent,
     burnin_steps: int | None,
     max_steps: int | None,
 ) -> ResultOrError:
@@ -615,6 +643,7 @@ def run(
     subject: The subject program filepath.
     subject_argv: Subject program arguments, as represented like `sys.argv` when
       executing a Python program. `subject_argv[0]` should be the program name.
+    agent: The agent for bug localization.
     burnin_steps: The maximum number of warmup steps to execute.
     max_steps: The maximum number of steps before termination.
 
@@ -643,6 +672,7 @@ def run(
     return run_from_exception(
         subject=subject,
         subject_argv=subject_argv,
+        agent=agent,
         exc_info=exc_info,
         burnin_steps=burnin_steps,
         max_steps=max_steps,
