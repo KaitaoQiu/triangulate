@@ -40,6 +40,7 @@ from triangulate import sampling_utils
 PROBE_FUNCTION_NAME = instrumentation_utils.PROBE_FUNCTION_NAME
 
 CONSOLE = logging_utils.CONSOLE
+rprint = CONSOLE.print
 print_horizontal_line = logging_utils.print_horizontal_line
 print_panel = logging_utils.print_panel
 
@@ -235,9 +236,9 @@ class AddProbes(Action):
 
   def update(self, state: State) -> State:
     """Updates state with new probes."""
-    CONSOLE.print("Adding probes:")
+    rprint("Adding probes:", style=logging_utils.ACTION_STYLE)
     for probe in self.probes:
-      print(f"  {probe.line_number}: {probe.statement}")
+      rprint(f"  {probe.line_number}: {probe.statement}")
 
     new_probes = tuple(
         sorted(state.probes + self.probes, key=lambda probe: probe.line_number)
@@ -428,7 +429,7 @@ class Environment:
         self.subject_with_probes = tempfile.NamedTemporaryFile(
             mode="r+", delete=False
         )
-        print(
+        rprint(
             f"The subject with probes saved to {self.subject_with_probes.name}."
         )
       else:
@@ -557,13 +558,13 @@ def run_with_bug_lineno(
       max_steps=max_steps,
   )
   while not env.terminate():
-    CONSOLE.print(f"Step {env.steps}:", style="bold blue")
+    CONSOLE.rule(title=f"[bold white]Step {env.steps}")
     action = agent.pick_action(env.state, env.reward())
     if isinstance(action, Halt):
-      CONSOLE.print("Stopping due to halt action.", style="bold blue")
+      rprint("Stopping due to halt action.", style="bold blue")
       break
     env.step(action)
-  CONSOLE.print(f"Done: {env.steps} steps performed.", style="bold blue")
+  rprint(f"Done: {env.steps} steps performed.", style="bold blue")
   return Result(env.state, env.steps)
 
 
@@ -600,7 +601,7 @@ def run_from_exception(
     illegal state expression could not be resolved from the exception, or the
     result of `run_with_bug_lineno` otherwise.
   """
-  CONSOLE.print("Exception caught:", style="bold yellow")
+  rprint("Exception caught:", style="bold yellow")
   _, exc_value, tb = exc_info
   if exc_value is None:
     raise NoExceptionRaised(subject=subject, subject_argv=subject_argv)
@@ -619,7 +620,7 @@ def run_from_exception(
         max_steps=max_steps,
     )
   except CouldNotResolveIllegalStateExpressionError as e:
-    CONSOLE.print(
+    rprint(
         "Could not resolve illegal state expression from exception:",
         style="bold red",
     )
@@ -657,7 +658,7 @@ def run(
   buffer = io.StringIO()
   exc_info = None
   try:
-    CONSOLE.print(rf"[blue][b]Running:[/b][/blue] {subject}")
+    rprint(rf"[bold blue]Running:[/] {subject}")
     with (
         contextlib.redirect_stdout(buffer),
         contextlib.redirect_stderr(buffer),
@@ -678,8 +679,8 @@ def run(
         max_steps=max_steps,
     )
 
-  CONSOLE.print(rf"[green][b]Success:[/b][/green] {subject}")
-  CONSOLE.print(
+  rprint(rf"[bold green]Success:[/] {subject}")
+  rprint(
       "Triangulate did not run because no exception was thrown.",
       style="bold green",
   )

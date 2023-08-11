@@ -22,6 +22,9 @@ from rich.panel import Panel
 
 CONSOLE = Console()
 
+STEP_STYLE = "bold blue"
+ACTION_STYLE = "bold purple4"
+
 
 def print_panel(renderable: Any, title: str = ""):
   CONSOLE.print(Panel(renderable, title=title))
