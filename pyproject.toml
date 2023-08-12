@@ -17,9 +17,13 @@ keywords = []
 # Installed locally with `pip install -e .`
 dependencies = [
     "absl-py",
+    "fire",
+    "google.generativeai",
     "numpy",
     "ordered-set",
+    "requests",
     "rich",
+    "python-dotenv",
     "python-graphs",
 ]
 
