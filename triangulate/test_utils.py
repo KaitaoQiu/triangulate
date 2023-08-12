@@ -12,25 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Printing and logging utilities."""
+"""Test utilities."""
 
-from typing import Any
+import pathlib
+from absl.testing import absltest
 
-from rich.console import Console
-from rich.panel import Panel
-
-
-CONSOLE = Console()
-
-STEP_STYLE = "bold blue"
-ACTION_STYLE = "bold purple4"
-
-rprint = CONSOLE.print
-
-
-def print_panel(renderable: Any, title: str = ""):
-  CONSOLE.print(Panel(renderable, title=title))
-
-
-def print_horizontal_line(title: str = ""):
-  CONSOLE.rule(title=title)
+TESTDATA_DIRECTORY: pathlib.Path = (
+    pathlib.Path(absltest.get_default_test_srcdir()) / 'triangulate/testdata'
+)
