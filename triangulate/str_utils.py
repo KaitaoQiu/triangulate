@@ -12,25 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Printing and logging utilities."""
-
-from typing import Any
-
-from rich.console import Console
-from rich.panel import Panel
+"""String utilities."""
 
 
-CONSOLE = Console()
-
-STEP_STYLE = "bold blue"
-ACTION_STYLE = "bold purple4"
-
-rprint = CONSOLE.print
+def leading_whitespace_count(s: str) -> int:
+  return len(s) - len(s.lstrip())
 
 
-def print_panel(renderable: Any, title: str = ""):
-  CONSOLE.print(Panel(renderable, title=title))
-
-
-def print_horizontal_line(title: str = ""):
-  CONSOLE.rule(title=title)
+def prepend_line_numbers(s: str) -> str:
+  lines = s.splitlines()
+  line_count_width = len(str(len(lines)))
+  lines_with_numbers = []
+  for i, line in enumerate(lines):
+    line_number = str(i).rjust(line_count_width)
+    lines_with_numbers.append(f"{line_number}: {line}")
+  return "\n".join(lines_with_numbers)

@@ -15,23 +15,17 @@
 """Main script."""
 
 import sys
-from types import TracebackType
-from typing import TypeAlias
 
 from absl import app
 from absl import flags
+
+from triangulate import agents
 from triangulate import core
-from triangulate import logging_utils
-
-ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
-
-CONSOLE = logging_utils.CONSOLE
-print_panel = logging_utils.print_panel
 
 _AGENT = flags.DEFINE_enum_class(
     "agent",
-    core.AgentEnum.RANDOM_PROBING,
-    core.AgentEnum,
+    agents.AgentEnum.RANDOM_PROBING,
+    agents.AgentEnum,
     help="The bug localization RL agent to use.",
 )
 # During burnin, the program stores outputs for later use to checking
