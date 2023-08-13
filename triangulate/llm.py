@@ -82,7 +82,7 @@ def list_palm_models():
     rprint(model)
 
 
-@retry.Retry(timeout=TIMEOUT_SECONDS)
+@retry.Retry(deadline=TIMEOUT_SECONDS)
 def generate_palm_text(
     prompt: str,
     model: ModelType | str | None = None,
