@@ -39,7 +39,6 @@ ProgramGraphNode = program_graph.ProgramGraphNode
 
 CONSOLE = logging_utils.CONSOLE
 rprint = CONSOLE.print
-print_horizontal_line = logging_utils.print_horizontal_line
 print_panel = logging_utils.print_panel
 
 
@@ -124,10 +123,10 @@ class State:
 
     if self.candidate_variables_to_inspect is None:
       self.candidate_variables_to_inspect = OrderedSet(
-          self.get_illegal_state_expression_identifiers()
+          self.illegal_state_expression_identifiers()
       )
 
-  def get_illegal_state_expression_identifiers(
+  def illegal_state_expression_identifiers(
       self,
   ) -> OrderedSet[ProgramGraphNode]:
     """Returns all variable identifiers in the illegal state expression."""

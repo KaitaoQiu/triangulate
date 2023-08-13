@@ -30,7 +30,3 @@ rprint = CONSOLE.print
 
 def print_panel(renderable: Any, title: str = ""):
   CONSOLE.print(Panel(renderable, title=title))
-
-
-def print_horizontal_line(title: str = ""):
-  CONSOLE.rule(title=title)

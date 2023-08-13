@@ -137,7 +137,7 @@ class RandomProbing(ProbingAgent):
     # Make probe statement, for inspecting the values of all variable in the
     # illegal state expression at a given line number.
     probe_variables = sorted(
-        n.node.id for n in state.get_illegal_state_expression_identifiers()
+        n.node.id for n in state.illegal_state_expression_identifiers()
     )
     probe_statement = instrumentation_utils.make_probe_call(probe_variables)
     return tuple((Probe(offset, probe_statement)) for offset in line_numbers)
@@ -257,7 +257,7 @@ class SearchAgent(Agent, Generic[SearchStrategy]):
 
 def make_search_agent_factory(
     strategy_type: type[SearchStrategy],
-) -> Callable[[], Agent]:
+) -> Callable[[], SearchAgent]:
   """Returns a factory function that creates a search agent with fresh state."""
   return lambda: SearchAgent(strategy_type=strategy_type)
 
